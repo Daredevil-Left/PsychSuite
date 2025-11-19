@@ -791,6 +791,11 @@ const SurveyConfig = ({ xlsxReady }) => {
             id: 1,
             name: "Variable 1",
             dimensions: [{ id: 1, name: 'D1', items: 5 }]
+        },
+        {
+            id: 2,
+            name: "Variable 2",
+            dimensions: [{ id: 1, name: 'D1', items: 5 }]
         }
     ]);
 
