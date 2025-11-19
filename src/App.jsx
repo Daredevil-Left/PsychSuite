@@ -803,6 +803,22 @@ const SurveyConfig = ({ xlsxReady }) => {
     const [surveyData, setSurveyData] = useState([]);
     const [summaryMode, setSummaryMode] = useState('sum'); // avg | sum
 
+    // Calcular rangos de preguntas para visualización
+    const questionRanges = useMemo(() => {
+        let current = 1;
+        const map = {};
+        variables.forEach(v => {
+            v.dimensions.forEach(d => {
+                const count = parseInt(d.items) || 0;
+                const start = current;
+                const end = current + count - 1;
+                map[`${v.id}-${d.id}`] = count > 0 ? (start === end ? `P${start}` : `P${start} - P${end}`) : 'Sin ítems';
+                current += count;
+            });
+        });
+        return map;
+    }, [variables]);
+
     // --- GESTIÓN DE CONFIGURACIÓN ---
 
     const addVariable = () => {
@@ -905,6 +921,17 @@ const SurveyConfig = ({ xlsxReady }) => {
             const json = XLSX.utils.sheet_to_json(ws, { header: 1 });
 
             if (json.length > 1) {
+                // Validación de columnas
+                const detectedCols = json[0].length;
+                if (detectedCols !== structure.totalColumns) {
+                    const proceed = window.confirm(
+                        `⚠️ Advertencia de Estructura\n\n` +
+                        `El archivo Excel tiene ${detectedCols} columnas, pero la configuración espera ${structure.totalColumns} ítems.\n\n` +
+                        `¿Desea continuar de todos modos? (Se tomarán las primeras ${structure.totalColumns} columnas)`
+                    );
+                    if (!proceed) return;
+                }
+
                 // Asumimos fila 1 headers.
                 // Validar si tenemos suficientes columnas? Por ahora leemos lo que haya hasta totalColumns
                 const dataRows = json.slice(1).map((row, i) => {
@@ -1034,25 +1061,32 @@ const SurveyConfig = ({ xlsxReady }) => {
 
                                 <div className="space-y-2 pl-2 border-l-2 border-slate-200">
                                     {v.dimensions.map((d) => (
-                                        <div key={d.id} className="flex gap-2 items-center">
-                                            <input
-                                                type="text"
-                                                value={d.name}
-                                                onChange={(e) => updateDimension(v.id, d.id, 'name', e.target.value)}
-                                                className="flex-1 p-1 text-xs border rounded"
-                                                placeholder="Dimensión"
-                                            />
-                                            <input
-                                                type="number"
-                                                value={d.items}
-                                                onChange={(e) => updateDimension(v.id, d.id, 'items', e.target.value)}
-                                                className="w-14 p-1 text-xs border rounded text-center"
-                                                placeholder="Items"
-                                                title="Cantidad de preguntas"
-                                            />
-                                            <button onClick={() => removeDimension(v.id, d.id)} className="text-slate-300 hover:text-red-400">
-                                                <X size={14} />
-                                            </button>
+                                        <div key={d.id} className="mb-2">
+                                            <div className="flex gap-2 items-center mb-1">
+                                                <input
+                                                    type="text"
+                                                    value={d.name}
+                                                    onChange={(e) => updateDimension(v.id, d.id, 'name', e.target.value)}
+                                                    className="flex-1 p-1 text-xs border rounded"
+                                                    placeholder="Dimensión"
+                                                />
+                                                <input
+                                                    type="number"
+                                                    value={d.items}
+                                                    onChange={(e) => updateDimension(v.id, d.id, 'items', e.target.value)}
+                                                    className="w-14 p-1 text-xs border rounded text-center"
+                                                    placeholder="Items"
+                                                    title="Cantidad de preguntas"
+                                                />
+                                                <button onClick={() => removeDimension(v.id, d.id)} className="text-slate-300 hover:text-red-400">
+                                                    <X size={14} />
+                                                </button>
+                                            </div>
+                                            <div className="text-[10px] text-slate-400 pl-1 flex items-center">
+                                                <span className="bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded border border-slate-200 font-mono">
+                                                    {questionRanges[`${v.id}-${d.id}`]}
+                                                </span>
+                                            </div>
                                         </div>
                                     ))}
                                     <button
