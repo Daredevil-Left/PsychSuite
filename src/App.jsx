@@ -19,7 +19,8 @@ import {
     Menu,
     X,
     RefreshCw,
-    FileText
+    FileText,
+    Activity
 } from 'lucide-react';
 
 // --- UTILIDADES Y CONFIGURACIÓN ---
@@ -1345,6 +1346,294 @@ const LikertRecoder = ({ xlsxReady }) => {
     );
 };
 
+// --- HERRAMIENTA 5: ALFA DE CRONBACH ---
+
+const CronbachAlpha = ({ xlsxReady }) => {
+    const [variables, setVariables] = useState([
+        { id: 1, name: "Variable 1", items: 10 },
+        { id: 2, name: "Variable 2", items: 10 }
+    ]);
+    const [surveyData, setSurveyData] = useState([]);
+    const [results, setResults] = useState(null);
+    const [copySuccess, setCopySuccess] = useState(false);
+
+    const addVariable = () => {
+        const newVar = {
+            id: Date.now(),
+            name: `Variable ${variables.length + 1}`,
+            items: 10
+        };
+        setVariables([...variables, newVar]);
+    };
+
+    const removeVariable = (id) => {
+        if (variables.length <= 1) return;
+        setVariables(variables.filter(v => v.id !== id));
+    };
+
+    const updateVariable = (id, field, val) => {
+        setVariables(variables.map(v => v.id === id ? { ...v, [field]: field === 'items' ? parseInt(val) || 0 : val } : v));
+    };
+
+    const totalItems = variables.reduce((acc, v) => acc + v.items, 0);
+
+    const handleFileUpload = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = (evt) => {
+            const wb = XLSX.read(evt.target.result, { type: 'binary' });
+            const ws = wb.Sheets[wb.SheetNames[0]];
+            const json = XLSX.utils.sheet_to_json(ws, { header: 1 });
+
+            if (json.length > 1) {
+                // Validar columnas
+                const detectedCols = json[0].length;
+                if (detectedCols < totalItems) {
+                    alert(`El archivo tiene ${detectedCols} columnas, pero se requieren ${totalItems} según la configuración.`);
+                    return;
+                }
+
+                // Asumimos fila 1 headers, resto datos
+                const dataRows = json.slice(1).map(row => {
+                    // Convertir a números y asegurar longitud
+                    const nums = row.slice(0, totalItems).map(v => parseFloat(v) || 0);
+                    return nums;
+                });
+                setSurveyData(dataRows);
+                setResults(null);
+            }
+        };
+        reader.readAsBinaryString(file);
+    };
+
+    const getInterpretation = (alpha) => {
+        if (alpha >= 0.81) return { text: "Muy alta", color: "text-green-700 bg-green-100" };
+        if (alpha >= 0.61) return { text: "Alta", color: "text-emerald-700 bg-emerald-100" };
+        if (alpha >= 0.41) return { text: "Media*", color: "text-yellow-700 bg-yellow-100" };
+        if (alpha >= 0.21) return { text: "Baja*", color: "text-orange-700 bg-orange-100" };
+        return { text: "Muy baja*", color: "text-red-700 bg-red-100" };
+    };
+
+    const calculate = () => {
+        if (surveyData.length === 0) return;
+
+        let currentIndex = 0;
+        const newResults = variables.map(v => {
+            const start = currentIndex;
+            const end = currentIndex + v.items;
+            currentIndex += v.items;
+
+            // Extraer datos para esta variable
+            // Matriz: filas = sujetos, columnas = items de esta variable
+            const varData = surveyData.map(row => row.slice(start, end));
+            const nItems = v.items;
+            const nSubjects = varData.length;
+
+            if (nItems < 2) return { ...v, alpha: 0, interpretation: getInterpretation(0) };
+
+            // 1. Varianza de cada ítem
+            let sumItemVariances = 0;
+            for (let i = 0; i < nItems; i++) {
+                const itemScores = varData.map(r => r[i]);
+                const mean = itemScores.reduce((a, b) => a + b, 0) / nSubjects;
+                const variance = itemScores.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / (nSubjects - 1);
+                sumItemVariances += variance;
+            }
+
+            // 2. Varianza del total
+            const totalScores = varData.map(row => row.reduce((a, b) => a + b, 0));
+            const totalMean = totalScores.reduce((a, b) => a + b, 0) / nSubjects;
+            const totalVariance = totalScores.reduce((a, b) => a + Math.pow(b - totalMean, 2), 0) / (nSubjects - 1);
+
+            // 3. Alfa
+            let alpha = 0;
+            if (totalVariance > 0) {
+                alpha = (nItems / (nItems - 1)) * (1 - (sumItemVariances / totalVariance));
+            }
+
+            return {
+                ...v,
+                alpha: alpha,
+                interpretation: getInterpretation(alpha)
+            };
+        });
+
+        setResults(newResults);
+    };
+
+    const copyAPA7 = () => {
+        if (!results) return;
+
+        let tableHTML = `
+            <style>
+                table { border-collapse: collapse; width: 100%; font-family: "Times New Roman", serif; font-size: 12pt; }
+                th, td { padding: 8px; text-align: left; border: 0; }
+                thead th { border-bottom: 1px solid black; border-top: 1px solid black; }
+                tbody tr:last-child td { border-bottom: 1px solid black; }
+                caption { text-align: left; font-weight: bold; margin-bottom: 10px; }
+                .note { font-size: 10pt; margin-top: 5px; font-style: italic; }
+            </style>
+            <table>
+                <caption>Tabla 2<br><span style="font-weight:normal; font-style:italic">Coeficientes de consistencia interna Alfa de Cronbach</span></caption>
+                <thead>
+                    <tr>
+                        <th>Variable</th>
+                        <th>N° Ítems</th>
+                        <th>α</th>
+                        <th>Interpretación</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${results.map(r => `
+                        <tr>
+                            <td>${r.name}</td>
+                            <td>${r.items}</td>
+                            <td>${r.alpha.toFixed(3)}</td>
+                            <td>${r.interpretation.text}</td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+            <div class="note">Nota. Interpretación basada en Palella y Martins (2012).</div>
+        `;
+
+        const type = "text/html";
+        const blob = new Blob([tableHTML], { type });
+        const data = [new ClipboardItem({ [type]: blob })];
+        navigator.clipboard.write(data).then(() => setCopySuccess(true));
+    };
+
+    useEffect(() => {
+        if (copySuccess) {
+            const timer = setTimeout(() => setCopySuccess(false), 2000);
+            return () => clearTimeout(timer);
+        }
+    }, [copySuccess]);
+
+    return (
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            {/* Configuración */}
+            <div className="lg:col-span-4 space-y-6">
+                <Card className="p-5">
+                    <h3 className="font-bold text-slate-800 mb-4 flex items-center">
+                        <Settings className="w-5 h-5 mr-2 text-blue-600" /> Configuración
+                    </h3>
+                    <div className="space-y-4">
+                        {variables.map((v, idx) => (
+                            <div key={v.id} className="bg-slate-50 p-3 rounded border">
+                                <div className="flex justify-between mb-2">
+                                    <span className="font-bold text-sm text-slate-600">Variable {idx + 1}</span>
+                                    {variables.length > 1 && (
+                                        <button onClick={() => removeVariable(v.id)} className="text-red-400 hover:text-red-600"><Trash2 size={16} /></button>
+                                    )}
+                                </div>
+                                <input
+                                    type="text"
+                                    value={v.name}
+                                    onChange={(e) => updateVariable(v.id, 'name', e.target.value)}
+                                    className="w-full p-2 border rounded text-sm mb-2"
+                                    placeholder="Nombre de la variable"
+                                />
+                                <div className="flex items-center gap-2">
+                                    <label className="text-xs font-bold text-slate-500">Ítems:</label>
+                                    <input
+                                        type="number"
+                                        value={v.items}
+                                        onChange={(e) => updateVariable(v.id, 'items', e.target.value)}
+                                        className="w-20 p-1 border rounded text-sm"
+                                    />
+                                </div>
+                            </div>
+                        ))}
+                        <Button variant="outline" onClick={addVariable} className="w-full text-sm"><Plus size={14} className="mr-1" /> Añadir Variable</Button>
+                    </div>
+                </Card>
+            </div>
+
+            {/* Datos y Resultados */}
+            <div className="lg:col-span-8 space-y-6">
+                <Card className="p-5">
+                    <div className="flex justify-between items-center mb-4">
+                        <div>
+                            <h3 className="font-bold text-lg text-slate-800">Carga de Datos</h3>
+                            <p className="text-sm text-slate-500">Se esperan {totalItems} columnas en total.</p>
+                        </div>
+                        <div className="relative">
+                            <input type="file" accept=".xlsx" onChange={handleFileUpload} className="absolute inset-0 w-full opacity-0 cursor-pointer" disabled={!xlsxReady} />
+                            <Button variant="secondary" icon={Upload} disabled={!xlsxReady}>Cargar Excel</Button>
+                        </div>
+                    </div>
+
+                    {surveyData.length > 0 && (
+                        <div className="space-y-6">
+                            <div className="bg-slate-50 p-3 rounded border text-sm text-slate-600">
+                                <CheckCircle size={16} className="inline text-green-500 mr-2" />
+                                Se han cargado <strong>{surveyData.length}</strong> filas de datos.
+                            </div>
+
+                            <Button variant="primary" onClick={calculate} className="w-full">Calcular Alfa de Cronbach</Button>
+                        </div>
+                    )}
+                </Card>
+
+                {results && (
+                    <Card className="p-0 overflow-hidden">
+                        <div className="bg-slate-800 text-white p-4 flex justify-between items-center">
+                            <h3 className="font-bold">Resultados</h3>
+                            <div className="flex gap-2 items-center">
+                                {copySuccess && <span className="text-xs text-emerald-500 animate-pulse">¡Copiado!</span>}
+                                <Button variant="secondary" icon={FileText} onClick={copyAPA7} className="text-xs">Copiar APA 7</Button>
+                            </div>
+                        </div>
+                        <div className="p-6">
+                            <table className="w-full text-sm text-left">
+                                <thead className="border-b-2 border-slate-200">
+                                    <tr>
+                                        <th className="p-3">Variable</th>
+                                        <th className="p-3 text-center">Ítems</th>
+                                        <th className="p-3 text-center">Alfa (α)</th>
+                                        <th className="p-3">Interpretación</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y">
+                                    {results.map((r, i) => (
+                                        <tr key={i}>
+                                            <td className="p-3 font-medium">{r.name}</td>
+                                            <td className="p-3 text-center text-slate-500">{r.items}</td>
+                                            <td className="p-3 text-center font-bold text-blue-600">{r.alpha.toFixed(3)}</td>
+                                            <td className="p-3">
+                                                <span className={`px-2 py-1 rounded text-xs font-bold ${r.interpretation.color}`}>
+                                                    {r.interpretation.text}
+                                                </span>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+
+                            <div className="mt-6 bg-blue-50 p-4 rounded-lg border border-blue-100">
+                                <h4 className="font-bold text-blue-800 mb-2 text-sm">Criterios de Interpretación</h4>
+                                <div className="grid grid-cols-2 gap-2 text-xs text-slate-600">
+                                    <div>0,81 - 1.00: <span className="font-bold text-green-700">Muy alta</span></div>
+                                    <div>0,61 - 0.80: <span className="font-bold text-emerald-700">Alta</span></div>
+                                    <div>0,41 - 0.60: <span className="font-bold text-yellow-700">Media*</span></div>
+                                    <div>0,21 - 0.40: <span className="font-bold text-orange-700">Baja*</span></div>
+                                    <div>0.00 - 0.20: <span className="font-bold text-red-700">Muy baja*</span></div>
+                                </div>
+                                <p className="text-[10px] text-slate-500 mt-2 italic">
+                                    * Se sugiere repetir la validación del instrumento puesto que es recomendable que el resultado sea mayor a 0,61.
+                                </p>
+                            </div>
+                        </div>
+                    </Card>
+                )}
+            </div>
+        </div>
+    );
+};
+
 // --- APP PRINCIPAL ---
 
 const App = () => {
@@ -1354,6 +1643,7 @@ const App = () => {
 
     const menuItems = [
         { id: 'aiken', label: 'Calculadora V de Aiken', icon: Calculator },
+        { id: 'cronbach', label: 'Alfa de Cronbach', icon: Activity },
         { id: 'ranges', label: 'Baremos y Rangos', icon: Table },
         { id: 'survey', label: 'Gestión de Encuesta', icon: FileSpreadsheet },
         { id: 'recode', label: 'Recodificador Likert', icon: ArrowLeftRight },
@@ -1408,6 +1698,7 @@ const App = () => {
 
                     <div className="animate-in fade-in duration-500">
                         {activeTab === 'aiken' && <AikenCalculator xlsxReady={xlsxReady} />}
+                        {activeTab === 'cronbach' && <CronbachAlpha xlsxReady={xlsxReady} />}
                         {activeTab === 'ranges' && <RangeCalculator />}
                         {activeTab === 'survey' && <SurveyConfig xlsxReady={xlsxReady} />}
                         {activeTab === 'recode' && <LikertRecoder xlsxReady={xlsxReady} />}
