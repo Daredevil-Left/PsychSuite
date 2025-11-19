@@ -1226,9 +1226,13 @@ const LikertRecoder = ({ xlsxReady }) => {
             const ws = wb.Sheets[wb.SheetNames[0]];
             const json = XLSX.utils.sheet_to_json(ws, { header: 1 });
             if (json.length > 0) {
+                // Asumimos que NO hay headers, generamos P1, P2...
+                const numCols = json[0].length;
+                const headers = Array.from({ length: numCols }, (_, i) => `P${i + 1}`);
+
                 setRawData({
-                    headers: json[0],
-                    rows: json.slice(1)
+                    headers: headers,
+                    rows: json
                 });
                 setSelectedCols(new Set());
             }
