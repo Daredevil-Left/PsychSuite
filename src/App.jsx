@@ -1366,7 +1366,12 @@ const App = () => {
                 className={`${isSidebarOpen ? 'w-64' : 'w-20'} bg-slate-900 text-white transition-all duration-300 flex flex-col sticky top-0 h-screen z-30 shadow-xl`}
             >
                 <div className="p-4 flex items-center justify-between border-b border-slate-800">
-                    {isSidebarOpen && <span className="font-bold text-xl tracking-tight">PsychSuite</span>}
+                    {isSidebarOpen && (
+                        <div className="flex items-center gap-3">
+                            <img src="/logo.png" alt="Logo" className="w-8 h-8 object-contain" />
+                            <span className="font-bold text-xl tracking-tight">PsychSuite</span>
+                        </div>
+                    )}
                     <button onClick={() => setSidebarOpen(!isSidebarOpen)} className="p-1 hover:bg-slate-800 rounded">
                         {isSidebarOpen ? <X size={20} /> : <Menu size={20} />}
                     </button>
