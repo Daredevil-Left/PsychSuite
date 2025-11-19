@@ -785,163 +785,388 @@ const RangeCalculator = () => {
 // --- HERRAMIENTA 3: CONFIGURACIÓN ENCUESTA ---
 
 const SurveyConfig = ({ xlsxReady }) => {
-    const [dims, setDims] = useState(3);
-    const [qsPerDim, setQsPerDim] = useState(5);
-    const [structure, setStructure] = useState(null);
-    const [surveyData, setSurveyData] = useState([]);
-    const [summaryMode, setSummaryMode] = useState('avg'); // avg | sum
+    // Configuración inicial: Array de variables
+    const [variables, setVariables] = useState([
+        {
+            id: 1,
+            name: "Variable 1",
+            dimensions: [{ id: 1, name: 'D1', items: 5 }]
+        }
+    ]);
 
-    const createStructure = () => {
-        const newStruct = {
-            variable: "Variable Principal",
-            dimensions: Array.from({ length: dims }).map((_, i) => ({
-                name: `D${i + 1}`,
-                questions: Array.from({ length: qsPerDim }).map((_, j) => `P${(i * qsPerDim) + j + 1}`)
-            }))
+    const [structure, setStructure] = useState(null); // Estructura compilada para la tabla
+    const [surveyData, setSurveyData] = useState([]);
+    const [summaryMode, setSummaryMode] = useState('sum'); // avg | sum
+
+    // --- GESTIÓN DE CONFIGURACIÓN ---
+
+    const addVariable = () => {
+        const newVar = {
+            id: Date.now(),
+            name: `Variable ${variables.length + 1}`,
+            dimensions: [{ id: Date.now(), name: 'D1', items: 5 }]
         };
-        setStructure(newStruct);
-        setSurveyData([]);
+        setVariables([...variables, newVar]);
     };
+
+    const removeVariable = (id) => {
+        if (variables.length <= 1) return;
+        setVariables(variables.filter(v => v.id !== id));
+    };
+
+    const updateVariable = (id, field, val) => {
+        setVariables(variables.map(v => v.id === id ? { ...v, [field]: val } : v));
+    };
+
+    const addDimension = (varId) => {
+        setVariables(variables.map(v => {
+            if (v.id === varId) {
+                return {
+                    ...v,
+                    dimensions: [...v.dimensions, { id: Date.now(), name: `D${v.dimensions.length + 1}`, items: 5 }]
+                };
+            }
+            return v;
+        }));
+    };
+
+    const removeDimension = (varId, dimId) => {
+        setVariables(variables.map(v => {
+            if (v.id === varId) {
+                if (v.dimensions.length <= 1) return v;
+                return { ...v, dimensions: v.dimensions.filter(d => d.id !== dimId) };
+            }
+            return v;
+        }));
+    };
+
+    const updateDimension = (varId, dimId, field, val) => {
+        setVariables(variables.map(v => {
+            if (v.id === varId) {
+                return {
+                    ...v,
+                    dimensions: v.dimensions.map(d =>
+                        d.id === dimId ? { ...d, [field]: field === 'items' ? parseInt(val) || 0 : val } : d
+                    )
+                };
+            }
+            return v;
+        }));
+    };
+
+    // --- GENERACIÓN DE ESTRUCTURA ---
+
+    const generateStructure = () => {
+        // Aplanar la estructura para facilitar el mapeo de columnas
+        let colIndex = 0;
+        const flatDims = [];
+
+        const compiledVars = variables.map(v => {
+            const compiledDims = v.dimensions.map(d => {
+                const dimObj = {
+                    ...d,
+                    startIndex: colIndex,
+                    questions: Array.from({ length: d.items }).map((_, i) => `${d.name}_P${i + 1}`)
+                };
+                colIndex += d.items;
+                flatDims.push(dimObj);
+                return dimObj;
+            });
+
+            return {
+                ...v,
+                dimensions: compiledDims,
+                totalItems: compiledDims.reduce((acc, d) => acc + d.items, 0)
+            };
+        });
+
+        setStructure({
+            variables: compiledVars,
+            totalColumns: colIndex
+        });
+        setSurveyData([]); // Resetear datos al cambiar estructura
+    };
+
+    // --- IMPORTACIÓN DE DATOS ---
 
     const handleFileUpload = (e) => {
         const file = e.target.files[0];
-        if (!file) return;
+        if (!file || !structure) return;
+
         const reader = new FileReader();
         reader.onload = (evt) => {
             const wb = XLSX.read(evt.target.result, { type: 'binary' });
             const ws = wb.Sheets[wb.SheetNames[0]];
             const json = XLSX.utils.sheet_to_json(ws, { header: 1 });
-            // Lógica simple: asumir fila 1 headers, resto datos.
-            // Mapear datos a una estructura plana temporal para mostrar
+
             if (json.length > 1) {
-                const dataRows = json.slice(1).map((row, i) => ({
-                    id: i + 1,
-                    values: row.slice(0, dims * qsPerDim).map(v => parseFloat(v) || 0)
-                }));
+                // Asumimos fila 1 headers.
+                // Validar si tenemos suficientes columnas? Por ahora leemos lo que haya hasta totalColumns
+                const dataRows = json.slice(1).map((row, i) => {
+                    // Asegurar que tenemos valores numéricos
+                    const cleanValues = row.slice(0, structure.totalColumns).map(v => parseFloat(v) || 0);
+                    // Rellenar con 0 si faltan columnas en el excel
+                    while (cleanValues.length < structure.totalColumns) cleanValues.push(0);
+
+                    return {
+                        id: i + 1,
+                        values: cleanValues
+                    };
+                });
                 setSurveyData(dataRows);
             }
         };
         reader.readAsBinaryString(file);
     };
 
-    const getSummary = useMemo(() => {
+    // --- CÁLCULOS Y RESUMEN ---
+
+    const summaryData = useMemo(() => {
         if (!structure || surveyData.length === 0) return [];
+
         return surveyData.map(subject => {
-            let offset = 0;
-            const dimResults = structure.dimensions.map(d => {
-                const qValues = subject.values.slice(offset, offset + d.questions.length);
-                offset += d.questions.length;
-                const sum = qValues.reduce((a, b) => a + b, 0);
+            const subjectSummary = { id: subject.id, vars: [] };
+
+            subjectSummary.vars = structure.variables.map(v => {
+                const dimResults = v.dimensions.map(d => {
+                    const qValues = subject.values.slice(d.startIndex, d.startIndex + d.items);
+                    const sum = qValues.reduce((a, b) => a + b, 0);
+                    return {
+                        name: d.name,
+                        val: summaryMode === 'sum' ? sum : parseFloat((sum / d.items).toFixed(2))
+                    };
+                });
+
+                // Total Variable
+                // Suma de los valores de todas las dimensiones de esta variable
+                // Ojo: si es promedio, ¿es promedio de promedios o promedio de items?
+                // Generalmente en psicometría se trabaja con sumas o promedios de items.
+                // Haremos promedio de todos los items de la variable.
+
+                // Recolectar todos los valores de la variable
+                let allVarValues = [];
+                v.dimensions.forEach(d => {
+                    allVarValues = allVarValues.concat(subject.values.slice(d.startIndex, d.startIndex + d.items));
+                });
+
+                const totalSum = allVarValues.reduce((a, b) => a + b, 0);
+                const totalVal = summaryMode === 'sum' ? totalSum : parseFloat((totalSum / (allVarValues.length || 1)).toFixed(2));
+
                 return {
-                    name: d.name,
-                    val: summaryMode === 'sum' ? sum : (sum / d.questions.length).toFixed(2)
+                    name: v.name,
+                    dims: dimResults,
+                    total: totalVal
                 };
             });
 
-            // Total
-            const totalSum = subject.values.reduce((a, b) => a + b, 0);
-            const totalVal = summaryMode === 'sum' ? totalSum : (totalSum / subject.values.length).toFixed(2);
-
-            return { id: subject.id, dims: dimResults, total: totalVal };
+            return subjectSummary;
         });
     }, [surveyData, structure, summaryMode]);
 
+    // --- EXPORTACIÓN ---
+
+    const exportSummaryToExcel = () => {
+        if (!summaryData.length) return;
+
+        // Construir headers
+        // Nivel 1: Variable | ... | Variable | ...
+        // Nivel 2: Dim1 | Dim2 | Total | Dim1 ...
+
+        // Haremos una estructura plana para la hoja de cálculo:
+        // Sujeto | Var1_Dim1 | Var1_Dim2 | Var1_Total | Var2_Dim1 ...
+
+        const headers = ["Sujeto"];
+        structure.variables.forEach(v => {
+            v.dimensions.forEach(d => {
+                headers.push(`${v.name} - ${d.name} (${summaryMode === 'sum' ? 'Suma' : 'Prom'})`);
+            });
+            headers.push(`${v.name} - TOTAL`);
+        });
+
+        const body = summaryData.map(row => {
+            const rowData = [row.id];
+            row.vars.forEach(v => {
+                v.dims.forEach(d => rowData.push(d.val));
+                rowData.push(v.total);
+            });
+            return rowData;
+        });
+
+        const ws = XLSX.utils.aoa_to_sheet([headers, ...body]);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Resumen");
+        XLSX.writeFile(wb, `resumen_encuesta_${summaryMode}.xlsx`);
+    };
+
     return (
-        <div className="space-y-6">
-            <Card className="p-5">
-                <div className="flex flex-wrap gap-4 items-end">
-                    <div>
-                        <label className="block text-sm font-medium mb-1">Dimensiones</label>
-                        <input type="number" value={dims} onChange={e => setDims(parseInt(e.target.value))} className="p-2 border rounded w-32" />
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            {/* Panel Izquierdo: Configuración */}
+            <div className="lg:col-span-4 space-y-6">
+                <Card className="p-5 max-h-[calc(100vh-200px)] overflow-y-auto">
+                    <div className="flex justify-between items-center mb-4 border-b pb-2">
+                        <h3 className="font-bold text-slate-800 flex items-center">
+                            <Settings className="w-5 h-5 mr-2 text-blue-600" /> Configuración
+                        </h3>
+                        <Button variant="secondary" onClick={addVariable} className="text-xs py-1 px-2">
+                            <Plus size={14} className="mr-1" /> Variable
+                        </Button>
                     </div>
-                    <div>
-                        <label className="block text-sm font-medium mb-1">Preguntas x Dim</label>
-                        <input type="number" value={qsPerDim} onChange={e => setQsPerDim(parseInt(e.target.value))} className="p-2 border rounded w-32" />
-                    </div>
-                    <Button onClick={createStructure}>Crear Estructura</Button>
 
-                    {structure && (
-                        <div className="ml-auto flex gap-2">
-                            <div className="relative">
-                                <input type="file" accept=".xlsx" onChange={handleFileUpload} className="absolute inset-0 w-full opacity-0 cursor-pointer" disabled={!xlsxReady} />
-                                <Button variant="secondary" icon={Upload} disabled={!xlsxReady}>Cargar Datos</Button>
-                            </div>
-                        </div>
-                    )}
-                </div>
-            </Card>
+                    <div className="space-y-6">
+                        {variables.map((v, vIdx) => (
+                            <div key={v.id} className="bg-slate-50 p-3 rounded-lg border border-slate-200">
+                                <div className="flex justify-between items-center mb-2">
+                                    <input
+                                        type="text"
+                                        value={v.name}
+                                        onChange={(e) => updateVariable(v.id, 'name', e.target.value)}
+                                        className="font-bold text-sm bg-transparent border-b border-transparent hover:border-slate-300 focus:border-blue-500 focus:outline-none w-full mr-2"
+                                    />
+                                    <button onClick={() => removeVariable(v.id)} className="text-slate-400 hover:text-red-500">
+                                        <Trash2 size={16} />
+                                    </button>
+                                </div>
 
-            {structure && (
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    {/* Tabla Estructura */}
-                    <Card className="p-0 overflow-hidden flex flex-col h-[500px]">
-                        <div className="p-3 bg-slate-50 border-b font-bold text-slate-700">Estructura de Datos</div>
-                        <div className="overflow-auto flex-1">
-                            <table className="w-full text-xs text-center border-collapse">
-                                <thead>
-                                    <tr>
-                                        <th rowSpan={3} className="bg-slate-100 border p-2 sticky left-0 z-20 w-16">Sujeto</th>
-                                        <th colSpan={dims * qsPerDim} className="bg-blue-50 border p-2">{structure.variable}</th>
-                                    </tr>
-                                    <tr>
-                                        {structure.dimensions.map((d, i) => (
-                                            <th key={i} colSpan={d.questions.length} className="bg-blue-100/50 border p-2">{d.name}</th>
-                                        ))}
-                                    </tr>
-                                    <tr>
-                                        {structure.dimensions.map(d => d.questions.map((q, j) => (
-                                            <th key={`${d.name}-${j}`} className="bg-slate-50 border p-1 min-w-[30px]">{q}</th>
-                                        )))}
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {surveyData.length > 0 ? surveyData.map((row, i) => (
-                                        <tr key={i}>
-                                            <td className="border p-1 bg-slate-50 sticky left-0 font-medium">#{row.id}</td>
-                                            {row.values.map((v, k) => (
-                                                <td key={k} className="border p-1">{v}</td>
-                                            ))}
-                                        </tr>
-                                    )) : (
-                                        <tr><td colSpan={dims * qsPerDim + 1} className="p-8 text-slate-400">Sube un Excel para poblar</td></tr>
-                                    )}
-                                </tbody>
-                            </table>
-                        </div>
-                    </Card>
-
-                    {/* Resumen */}
-                    <Card className="p-0 overflow-hidden flex flex-col h-[500px]">
-                        <div className="p-3 bg-slate-50 border-b flex justify-between items-center">
-                            <span className="font-bold text-slate-700">Tabla Resumen</span>
-                            <div className="flex bg-white rounded border overflow-hidden">
-                                <button onClick={() => setSummaryMode('avg')} className={`px-3 py-1 text-xs ${summaryMode === 'avg' ? 'bg-blue-600 text-white' : 'text-slate-600'}`}>Promedios</button>
-                                <button onClick={() => setSummaryMode('sum')} className={`px-3 py-1 text-xs ${summaryMode === 'sum' ? 'bg-blue-600 text-white' : 'text-slate-600'}`}>Sumas</button>
-                            </div>
-                        </div>
-                        <div className="overflow-auto flex-1">
-                            <table className="w-full text-sm text-center">
-                                <thead className="bg-slate-50 sticky top-0">
-                                    <tr>
-                                        <th className="p-2 border-b">Sujeto</th>
-                                        {structure.dimensions.map((d, i) => <th key={i} className="p-2 border-b">{d.name}</th>)}
-                                        <th className="p-2 border-b font-bold bg-slate-100">Total</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y">
-                                    {getSummary.map((row, i) => (
-                                        <tr key={i}>
-                                            <td className="p-2 font-medium">#{row.id}</td>
-                                            {row.dims.map((d, j) => <td key={j} className="p-2">{d.val}</td>)}
-                                            <td className="p-2 font-bold bg-slate-50">{row.total}</td>
-                                        </tr>
+                                <div className="space-y-2 pl-2 border-l-2 border-slate-200">
+                                    {v.dimensions.map((d) => (
+                                        <div key={d.id} className="flex gap-2 items-center">
+                                            <input
+                                                type="text"
+                                                value={d.name}
+                                                onChange={(e) => updateDimension(v.id, d.id, 'name', e.target.value)}
+                                                className="flex-1 p-1 text-xs border rounded"
+                                                placeholder="Dimensión"
+                                            />
+                                            <input
+                                                type="number"
+                                                value={d.items}
+                                                onChange={(e) => updateDimension(v.id, d.id, 'items', e.target.value)}
+                                                className="w-14 p-1 text-xs border rounded text-center"
+                                                placeholder="Items"
+                                                title="Cantidad de preguntas"
+                                            />
+                                            <button onClick={() => removeDimension(v.id, d.id)} className="text-slate-300 hover:text-red-400">
+                                                <X size={14} />
+                                            </button>
+                                        </div>
                                     ))}
-                                </tbody>
-                            </table>
-                        </div>
-                    </Card>
-                </div>
-            )}
+                                    <button
+                                        onClick={() => addDimension(v.id)}
+                                        className="text-xs text-blue-600 hover:text-blue-800 flex items-center mt-2"
+                                    >
+                                        <Plus size={12} className="mr-1" /> Dimensión
+                                    </button>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+
+                    <div className="mt-6 pt-4 border-t">
+                        <Button onClick={generateStructure} className="w-full">
+                            <RefreshCw size={16} className="mr-2" /> Generar Estructura
+                        </Button>
+                    </div>
+                </Card>
+            </div>
+
+            {/* Panel Derecho: Datos y Resultados */}
+            <div className="lg:col-span-8 space-y-6">
+                {structure ? (
+                    <>
+                        {/* Acciones y Carga */}
+                        <Card className="p-4 flex flex-wrap gap-4 justify-between items-center bg-white">
+                            <div className="flex items-center gap-4">
+                                <div className="text-sm text-slate-600">
+                                    <span className="font-bold text-slate-900">{structure.variables.length}</span> Variables |
+                                    <span className="font-bold text-slate-900 ml-1">{structure.totalColumns}</span> Preguntas Totales
+                                </div>
+                            </div>
+                            <div className="flex gap-2">
+                                <div className="relative">
+                                    <input type="file" accept=".xlsx" onChange={handleFileUpload} className="absolute inset-0 w-full opacity-0 cursor-pointer" disabled={!xlsxReady} />
+                                    <Button variant="secondary" icon={Upload} disabled={!xlsxReady}>Cargar Excel</Button>
+                                </div>
+                            </div>
+                        </Card>
+
+                        {/* Tabla Resumen */}
+                        <Card className="p-0 overflow-hidden flex flex-col h-[500px]">
+                            <div className="p-3 bg-slate-50 border-b flex justify-between items-center">
+                                <h3 className="font-bold text-slate-700 flex items-center">
+                                    <Table className="w-4 h-4 mr-2" /> Tabla Resumen
+                                </h3>
+                                <div className="flex gap-3 items-center">
+                                    <div className="flex bg-white rounded border overflow-hidden">
+                                        <button onClick={() => setSummaryMode('avg')} className={`px-3 py-1 text-xs font-medium transition-colors ${summaryMode === 'avg' ? 'bg-blue-600 text-white' : 'text-slate-600 hover:bg-slate-50'}`}>Promedios</button>
+                                        <button onClick={() => setSummaryMode('sum')} className={`px-3 py-1 text-xs font-medium transition-colors ${summaryMode === 'sum' ? 'bg-blue-600 text-white' : 'text-slate-600 hover:bg-slate-50'}`}>Sumas</button>
+                                    </div>
+                                    <Button variant="success" icon={Download} onClick={exportSummaryToExcel} disabled={summaryData.length === 0} className="text-xs py-1">
+                                        Exportar Excel
+                                    </Button>
+                                </div>
+                            </div>
+
+                            <div className="overflow-auto flex-1">
+                                {summaryData.length > 0 ? (
+                                    <table className="w-full text-sm text-center border-collapse">
+                                        <thead className="bg-slate-50 sticky top-0 z-10 shadow-sm">
+                                            <tr>
+                                                <th rowSpan={2} className="p-2 border-b border-r bg-slate-100 sticky left-0 z-20">Sujeto</th>
+                                                {structure.variables.map((v, i) => (
+                                                    <th key={i} colSpan={v.dimensions.length + 1} className="p-2 border-b border-r font-bold text-slate-700 bg-blue-50/50">
+                                                        {v.name}
+                                                    </th>
+                                                ))}
+                                            </tr>
+                                            <tr>
+                                                {structure.variables.map(v => (
+                                                    <>
+                                                        {v.dimensions.map((d, j) => (
+                                                            <th key={`${v.id}-${d.id}`} className="p-2 border-b border-r text-xs text-slate-600 font-medium min-w-[80px]">
+                                                                {d.name}
+                                                            </th>
+                                                        ))}
+                                                        <th className="p-2 border-b border-r text-xs font-bold text-blue-700 bg-blue-50 min-w-[80px]">Total</th>
+                                                    </>
+                                                ))}
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-100">
+                                            {summaryData.map((row, i) => (
+                                                <tr key={i} className="hover:bg-slate-50">
+                                                    <td className="p-2 font-medium text-slate-500 border-r bg-slate-50 sticky left-0">#{row.id}</td>
+                                                    {row.vars.map((v, j) => (
+                                                        <React.Fragment key={j}>
+                                                            {v.dims.map((d, k) => (
+                                                                <td key={k} className="p-2 border-r text-slate-600">{d.val}</td>
+                                                            ))}
+                                                            <td className="p-2 border-r font-bold text-blue-700 bg-blue-50/30">{v.total}</td>
+                                                        </React.Fragment>
+                                                    ))}
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                ) : (
+                                    <div className="h-full flex flex-col items-center justify-center text-slate-400">
+                                        <FileSpreadsheet size={48} className="mb-4 opacity-20" />
+                                        <p>Carga un archivo Excel para ver los resultados</p>
+                                        <p className="text-xs mt-2">El archivo debe tener al menos {structure.totalColumns} columnas de datos numéricos.</p>
+                                    </div>
+                                )}
+                            </div>
+                        </Card>
+                    </>
+                ) : (
+                    <div className="h-full flex flex-col items-center justify-center text-slate-400 border-2 border-dashed border-slate-300 rounded-xl p-10 bg-slate-50/50">
+                        <Settings size={48} className="mb-4 opacity-20" />
+                        <p className="font-medium text-lg text-slate-600">Configura tu Encuesta</p>
+                        <p className="max-w-md text-center mt-2 text-sm">
+                            Define las variables y sus dimensiones en el panel izquierdo. Luego haz clic en "Generar Estructura" para comenzar a procesar datos.
+                        </p>
+                    </div>
+                )}
+            </div>
         </div>
     );
 };
