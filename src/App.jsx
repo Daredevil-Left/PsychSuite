@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import * as XLSX from 'xlsx';
-import jsPDF from 'jspdf';
-import 'jspdf-autotable';
+import { jsPDF } from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import {
     Calculator,
     FileSpreadsheet,
@@ -167,7 +167,7 @@ const AikenCalculator = ({ xlsxReady }) => {
         if (!results) return;
         const doc = new jsPDF();
         doc.text("Resultados V de Aiken", 14, 16);
-        doc.autoTable({
+        autoTable(doc, {
             head: [['Ítem', 'Coef. V', 'Veredicto']],
             body: results.map(r => [r.item, r.v, r.verdict]),
             startY: 20
@@ -531,32 +531,32 @@ const RangeCalculator = () => {
             }];
 
             return allDims.map(dim => {
-            const minRaw = dim.items * itemScale.min;
-            const maxRaw = dim.items * itemScale.max;
-            const range = maxRaw - minRaw;
-            const interval = range / levelConfig.count; // Intervalo matemático
+                const minRaw = dim.items * itemScale.min;
+                const maxRaw = dim.items * itemScale.max;
+                const range = maxRaw - minRaw;
+                const interval = range / levelConfig.count; // Intervalo matemático
 
-            const levels = [];
-            let currentLower = minRaw;
+                const levels = [];
+                let currentLower = minRaw;
 
-            for (let i = 0; i < levelConfig.count; i++) {
-                // Lógica discreta simple
-                let upper = Math.floor(minRaw + interval * (i + 1));
-                // Ajuste fino para el último nivel para asegurar que toque el máximo
-                if (i === levelConfig.count - 1) upper = maxRaw;
+                for (let i = 0; i < levelConfig.count; i++) {
+                    // Lógica discreta simple
+                    let upper = Math.floor(minRaw + interval * (i + 1));
+                    // Ajuste fino para el último nivel para asegurar que toque el máximo
+                    if (i === levelConfig.count - 1) upper = maxRaw;
 
-                // Ajuste para el siguiente nivel (si no es el primero, empieza donde terminó el anterior + 1 si son enteros)
-                // Aquí usamos una lógica inclusiva simple:
-                // Nivel 1: Min -> Corte 1
-                // Nivel 2: Corte 1 + 1 -> Corte 2
-                const displayLower = i === 0 ? minRaw : Math.floor(minRaw + interval * i) + 1;
+                    // Ajuste para el siguiente nivel (si no es el primero, empieza donde terminó el anterior + 1 si son enteros)
+                    // Aquí usamos una lógica inclusiva simple:
+                    // Nivel 1: Min -> Corte 1
+                    // Nivel 2: Corte 1 + 1 -> Corte 2
+                    const displayLower = i === 0 ? minRaw : Math.floor(minRaw + interval * i) + 1;
 
-                levels.push({
-                    name: levelNames[i] || `Nivel ${i + 1}`,
-                    range: `${displayLower} - ${upper}`
-                });
-            }
-            return { name: dim.name, levels };
+                    levels.push({
+                        name: levelNames[i] || `Nivel ${i + 1}`,
+                        range: `${displayLower} - ${upper}`
+                    });
+                }
+                return { name: dim.name, levels };
             });
         });
         setGeneratedTable(results);
@@ -1110,8 +1110,8 @@ const App = () => {
                             key={item.id}
                             onClick={() => setActiveTab(item.id)}
                             className={`w-full flex items-center p-3 rounded-lg transition-colors ${activeTab === item.id
-                                    ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20'
-                                    : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                                ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20'
+                                : 'text-slate-400 hover:bg-slate-800 hover:text-white'
                                 }`}
                         >
                             <item.icon size={20} className={`${isSidebarOpen ? 'mr-3' : 'mx-auto'}`} />
