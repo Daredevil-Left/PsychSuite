@@ -335,11 +335,17 @@ const AikenCalculator = ({ xlsxReady }) => {
 
 const RangeCalculator = () => {
     const [itemScale, setItemScale] = useState({ min: 1, max: 5 });
-    const [variableName, setVariableName] = useState("Estrés Laboral");
-    const [dimensions, setDimensions] = useState([{ id: 1, name: 'Dimensión 1', items: 10 }]);
+    const [variables, setVariables] = useState([
+        {
+            id: 1,
+            name: "Estrés Laboral",
+            dimensions: [{ id: 1, name: 'Dimensión 1', items: 10 }]
+        }
+    ]);
     const [levelConfig, setLevelConfig] = useState({ count: 3, template: 'levels' }); // levels: Bajo/Medio/Alto
     const [levelNames, setLevelNames] = useState(["Bajo", "Medio", "Alto"]);
     const [generatedTable, setGeneratedTable] = useState(null);
+    const [copySuccess, setCopySuccess] = useState(false);
 
     const templates = {
         3: ["Bajo", "Medio", "Alto"],
@@ -353,27 +359,59 @@ const RangeCalculator = () => {
         setLevelNames(defaultNames);
     }, [levelConfig.count]);
 
-    const addDimension = () => {
-        setDimensions([...dimensions, { id: Date.now(), name: `Dimensión ${dimensions.length + 1}`, items: 5 }]);
+    const addVariable = () => {
+        const newVariable = {
+            id: Date.now(),
+            name: `Variable ${variables.length + 1}`,
+            dimensions: [{ id: Date.now(), name: 'Dimensión 1', items: 10 }]
+        };
+        setVariables([...variables, newVariable]);
     };
 
-    const removeDimension = (id) => {
-        setDimensions(dimensions.filter(d => d.id !== id));
+    const updateVariableName = (varId, newName) => {
+        setVariables(variables.map(v => v.id === varId ? { ...v, name: newName } : v));
     };
 
-    const updateDimension = (id, field, val) => {
-        setDimensions(dimensions.map(d => d.id === id ? { ...d, [field]: field === 'items' ? parseInt(val) || 0 : val } : d));
+    const addDimension = (varId) => {
+        setVariables(variables.map(v => {
+            if (v.id === varId) {
+                const newDimension = { id: Date.now(), name: `Dimensión ${v.dimensions.length + 1}`, items: 5 };
+                return { ...v, dimensions: [...v.dimensions, newDimension] };
+            }
+            return v;
+        }));
+    };
+
+    const removeDimension = (varId, dimId) => {
+        setVariables(variables.map(v => {
+            if (v.id === varId) {
+                return { ...v, dimensions: v.dimensions.filter(d => d.id !== dimId) };
+            }
+            return v;
+        }));
+    };
+
+    const updateDimension = (varId, dimId, field, val) => {
+        setVariables(variables.map(v => {
+            if (v.id === varId) {
+                const newDimensions = v.dimensions.map(d =>
+                    d.id === dimId ? { ...d, [field]: field === 'items' ? parseInt(val) || 0 : val } : d
+                );
+                return { ...v, dimensions: newDimensions };
+            }
+            return v;
+        }));
     };
 
     const generateRanges = () => {
-        // Calcular rangos globales y por dimensión
-        const allDims = [...dimensions, {
-            id: 'total',
-            name: `TOTAL (${variableName})`,
-            items: dimensions.reduce((sum, d) => sum + d.items, 0)
-        }];
+        const results = variables.flatMap(variable => {
+            const allDims = [...variable.dimensions, {
+                id: 'total',
+                name: `TOTAL (${variable.name})`,
+                items: variable.dimensions.reduce((sum, d) => sum + d.items, 0)
+            }];
 
-        const results = allDims.map(dim => {
+            return allDims.map(dim => {
             const minRaw = dim.items * itemScale.min;
             const maxRaw = dim.items * itemScale.max;
             const range = maxRaw - minRaw;
@@ -400,9 +438,96 @@ const RangeCalculator = () => {
                 });
             }
             return { name: dim.name, levels };
+            });
         });
         setGeneratedTable(results);
     };
+
+    const exportToExcel = () => {
+        if (!generatedTable) return;
+
+        const header = ["Componente", ...levelNames];
+        const body = generatedTable.map(row => [
+            row.name,
+            ...row.levels.map(lvl => lvl.range)
+        ]);
+
+        const ws = XLSX.utils.aoa_to_sheet([header, ...body]);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Baremos");
+        XLSX.writeFile(wb, "tabla_de_baremos.xlsx");
+    };
+
+    const copyAsAPA7 = () => {
+        if (!generatedTable) return;
+
+        const variableTitle = variables.map(v => v.name).join(' & ');
+
+        let tableHTML = `
+            <style>
+                table {
+                    border-collapse: collapse;
+                    width: 100%;
+                    font-family: "Times New Roman", serif;
+                    font-size: 10pt;
+                    border-top: 2px solid black;
+                    border-bottom: 2px solid black;
+                }
+                th, td {
+                    border: 0;
+                    padding: 8px;
+                    text-align: left;
+                }
+                thead th {
+                    border-bottom: 1px solid black;
+                }
+                caption {
+                    caption-side: top;
+                    font-weight: bold;
+                    text-align: left;
+                    padding-bottom: 5px;
+                }
+            </style>
+            <table>
+                <caption>Tabla 1</caption>
+                <thead>
+                    <tr><th>${variableTitle}</th></tr>
+                    <tr>
+                        <th>Componente</th>
+                        ${levelNames.map(n => `<th>${n}</th>`).join('')}
+                    </tr>
+                </thead>
+                <tbody>
+                    ${generatedTable.map(row => `
+                        <tr>
+                            <td>${row.name}</td>
+                            ${row.levels.map(lvl => `<td>${lvl.range}</td>`).join('')}
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        `;
+
+        const type = "text/html";
+        const blob = new Blob([tableHTML], { type });
+        const data = [new ClipboardItem({ [type]: blob })];
+
+        navigator.clipboard.write(data).then(
+            () => {
+                setCopySuccess(true);
+            },
+            () => {
+                console.error("Error al copiar");
+            }
+        );
+    };
+
+    useEffect(() => {
+        if (copySuccess) {
+            const timer = setTimeout(() => setCopySuccess(false), 2000);
+            return () => clearTimeout(timer);
+        }
+    }, [copySuccess]);
 
     return (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
@@ -423,39 +548,49 @@ const RangeCalculator = () => {
 
                 <Card className="p-5 space-y-4">
                     <h3 className="font-bold text-slate-800 border-b pb-2">2. Estructura del Test</h3>
-                    <div>
-                        <label className="text-sm text-slate-600">Nombre Variable</label>
-                        <input type="text" value={variableName} onChange={e => setVariableName(e.target.value)} className="w-full p-2 border rounded mt-1" />
-                    </div>
-                    <div className="space-y-2 max-h-48 overflow-y-auto">
-                        {dimensions.map((d) => (
-                            <div key={d.id} className="flex gap-2 items-center bg-slate-50 p-2 rounded">
-                                <input type="text" value={d.name} onChange={e => updateDimension(d.id, 'name', e.target.value)} className="flex-1 p-1 text-sm border rounded" />
-                                <input type="number" value={d.items} onChange={e => updateDimension(d.id, 'items', e.target.value)} className="w-16 p-1 text-sm border rounded text-center" placeholder="Items" />
-                                {dimensions.length > 1 && (
-                                    <button onClick={() => removeDimension(d.id)} className="text-red-400 hover:text-red-600"><Trash2 size={16} /></button>
-                                )}
+                    <div className="space-y-4">
+                        {variables.map((v, vIdx) => (
+                            <div key={v.id} className="p-3 bg-slate-50 rounded-lg">
+                                <label className="text-sm text-slate-600">Nombre Variable {vIdx + 1}</label>
+                                <input
+                                    type="text"
+                                    value={v.name}
+                                    onChange={e => updateVariableName(v.id, e.target.value)}
+                                    className="w-full p-2 border rounded mt-1 mb-3"
+                                />
+                                <div className="space-y-2 max-h-48 overflow-y-auto">
+                                    {v.dimensions.map((d) => (
+                                        <div key={d.id} className="flex gap-2 items-center bg-white p-2 rounded">
+                                            <input type="text" value={d.name} onChange={e => updateDimension(v.id, d.id, 'name', e.target.value)} className="flex-1 p-1 text-sm border rounded" />
+                                            <input type="number" value={d.items} onChange={e => updateDimension(v.id, d.id, 'items', e.target.value)} className="w-16 p-1 text-sm border rounded text-center" placeholder="Items" />
+                                            {v.dimensions.length > 1 && (
+                                                <button onClick={() => removeDimension(v.id, d.id)} className="text-red-400 hover:text-red-600"><Trash2 size={16} /></button>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                                <Button variant="outline" onClick={() => addDimension(v.id)} className="w-full py-1 text-sm mt-2"><Plus size={14} className="mr-1" /> Añadir Dimensión</Button>
                             </div>
                         ))}
                     </div>
-                    <Button variant="outline" onClick={addDimension} className="w-full py-1 text-sm"><Plus size={14} className="mr-1" /> Añadir Dimensión</Button>
+                    <Button variant="secondary" onClick={addVariable} className="w-full py-2 text-sm"><Plus size={14} className="mr-1" /> Añadir Variable</Button>
                 </Card>
 
                 <Card className="p-5 space-y-4">
                     <h3 className="font-bold text-slate-800 border-b pb-2">3. Niveles Cualitativos</h3>
-                    <div className="flex gap-4">
-                        <div className="w-1/3">
-                            <label className="text-xs uppercase font-bold text-slate-500">Cant. Niveles</label>
-                            <select value={levelConfig.count} onChange={e => setLevelConfig({ ...levelConfig, count: parseInt(e.target.value) })} className="w-full p-2 border rounded mt-1 bg-white">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-start">
+                        <div className="md:col-span-1">
+                            <label className="block text-sm font-medium text-slate-600 mb-1">Cant. Niveles</label>
+                            <select value={levelConfig.count} onChange={e => setLevelConfig({ ...levelConfig, count: parseInt(e.target.value) })} className="w-full p-2 border rounded bg-white">
                                 <option value={2}>2 (Dicotómico)</option>
                                 <option value={3}>3 (Tricotómico)</option>
                                 <option value={4}>4 (Cuartiles)</option>
                                 <option value={5}>5 (Pentatómico)</option>
                             </select>
                         </div>
-                        <div className="w-2/3">
-                            <label className="text-xs uppercase font-bold text-slate-500">Etiquetas</label>
-                            <div className="grid grid-cols-2 gap-1 mt-1">
+                        <div className="md:col-span-2">
+                            <label className="block text-sm font-medium text-slate-600 mb-1">Etiquetas</label>
+                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                                 {levelNames.map((name, i) => (
                                     <input
                                         key={i}
@@ -466,25 +601,36 @@ const RangeCalculator = () => {
                                             newNames[i] = e.target.value;
                                             setLevelNames(newNames);
                                         }}
-                                        className="text-xs p-1 border rounded"
+                                        className="w-full p-2 border rounded"
                                     />
                                 ))}
                             </div>
                         </div>
                     </div>
-                    <Button variant="primary" className="w-full mt-2" onClick={generateRanges}>Generar Tabla de Baremos</Button>
+                    <Button variant="primary" className="w-full" onClick={generateRanges}>Generar Tabla de Baremos</Button>
                 </Card>
             </div>
 
             <div className="lg:col-span-7">
                 {generatedTable ? (
                     <Card className="h-full p-0 overflow-hidden">
-                        <div className="bg-slate-800 text-white p-4">
-                            <h3 className="font-bold text-lg">Tabla de Baremos</h3>
-                            <p className="text-slate-400 text-sm">{variableName} • Escala {itemScale.min}-{itemScale.max}</p>
+                        <div className="bg-slate-800 text-white p-4 flex justify-between items-center">
+                            <div>
+                                <h3 className="font-bold text-lg">Tabla de Baremos</h3>
+                                <p className="text-slate-400 text-sm">{variables.map(v => v.name).join(' & ')} • Escala {itemScale.min}-{itemScale.max}</p>
+                            </div>
+                            <div className="flex gap-2 items-center">
+                                {copySuccess && <span className="text-xs text-emerald-500 animate-pulse">¡Copiado!</span>}
+                                <Button variant="secondary" icon={FileText} onClick={copyAsAPA7} className="text-sm">
+                                    APA7
+                                </Button>
+                                <Button variant="secondary" icon={Download} onClick={exportToExcel} className="text-sm">
+                                    Excel
+                                </Button>
+                            </div>
                         </div>
                         <div className="overflow-auto">
-                            <table className="w-full text-sm text-left">
+                            <table className="w-full text-sm text-left" id="baremos-table">
                                 <thead className="bg-slate-50 text-slate-700 border-b">
                                     <tr>
                                         <th className="p-3">Componente</th>
