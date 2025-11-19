@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import * as XLSX from 'xlsx';
+import jsPDF from 'jspdf';
+import 'jspdf-autotable';
 import {
     Calculator,
     FileSpreadsheet,
@@ -71,6 +73,7 @@ const AikenCalculator = ({ xlsxReady }) => {
     ]);
     const [data, setData] = useState([]);
     const [results, setResults] = useState(null);
+    const [copySuccess, setCopySuccess] = useState(false);
 
     // Inicializar matriz de datos
     useEffect(() => {
@@ -159,6 +162,101 @@ const AikenCalculator = ({ xlsxReady }) => {
         });
         setResults(newResults);
     };
+
+    const exportPDF = () => {
+        if (!results) return;
+        const doc = new jsPDF();
+        doc.text("Resultados V de Aiken", 14, 16);
+        doc.autoTable({
+            head: [['Ítem', 'Coef. V', 'Veredicto']],
+            body: results.map(r => [r.item, r.v, r.verdict]),
+            startY: 20
+        });
+        doc.save('resultados_v_aiken.pdf');
+    };
+
+    const copyAsAPA7 = () => {
+        if (!results) return;
+
+        let tableHTML = `
+            <style>
+                table {
+                    border-collapse: collapse;
+                    width: 100%;
+                    font-family: "Times New Roman", serif;
+                    font-size: 10pt;
+                    border-top: 2px solid black;
+                    border-bottom: 2px solid black;
+                }
+                th, td {
+                    border: 0;
+                    padding: 8px;
+                    text-align: left;
+                }
+                thead th {
+                    border-bottom: 1px solid black;
+                }
+                caption {
+                    caption-side: top;
+                    font-weight: bold;
+                    text-align: left;
+                    padding-bottom: 5px;
+                }
+                .title {
+                    font-style: italic;
+                }
+                .note {
+                    text-align: left;
+                    font-size: 8pt;
+                }
+            </style>
+            <table>
+                <caption>Tabla 1</caption>
+                <thead>
+                    <tr><th colspan="3" class="title">Resultados V de Aiken</th></tr>
+                    <tr>
+                        <th>Ítem</th>
+                        <th>Coef. V</th>
+                        <th>Veredicto</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${results.map(row => `
+                        <tr>
+                            <td>${row.item}</td>
+                            <td>${row.v}</td>
+                            <td>${row.verdict}</td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+                <tfoot>
+                    <tr>
+                        <td colspan="3" class="note">Nota.</td>
+                    </tr>
+                </tfoot>
+            </table>
+        `;
+
+        const type = "text/html";
+        const blob = new Blob([tableHTML], { type });
+        const data = [new ClipboardItem({ [type]: blob })];
+
+        navigator.clipboard.write(data).then(
+            () => {
+                setCopySuccess(true);
+            },
+            () => {
+                console.error("Error al copiar");
+            }
+        );
+    };
+
+    useEffect(() => {
+        if (copySuccess) {
+            const timer = setTimeout(() => setCopySuccess(false), 2000);
+            return () => clearTimeout(timer);
+        }
+    }, [copySuccess]);
 
     return (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
@@ -322,6 +420,27 @@ const AikenCalculator = ({ xlsxReady }) => {
                                         ))}
                                     </tbody>
                                 </table>
+                            </div>
+                            <div className="p-2 bg-slate-50 border-t flex gap-2">
+                                <Button
+                                    variant="secondary"
+                                    icon={Download}
+                                    onClick={exportPDF}
+                                    disabled={!results}
+                                    className="w-full text-sm"
+                                >
+                                    Descargar PDF
+                                </Button>
+                                {copySuccess && <span className="text-xs text-emerald-500 animate-pulse">¡Copiado!</span>}
+                                <Button
+                                    variant="secondary"
+                                    icon={FileText}
+                                    onClick={copyAsAPA7}
+                                    disabled={!results}
+                                    className="w-full text-sm"
+                                >
+                                    Copiar APA 7
+                                </Button>
                             </div>
                         </Card>
                     )}
