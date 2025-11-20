@@ -20,7 +20,8 @@ import {
     X,
     RefreshCw,
     FileText,
-    Activity
+    Activity,
+    ArrowLeft
 } from 'lucide-react';
 
 // --- UTILIDADES Y CONFIGURACIÓN ---
@@ -1340,76 +1341,475 @@ const LikertRecoder = ({ xlsxReady }) => {
                             </table>
                         </div>
                     </Card>
-                    const [activeTab, setActiveTab] = useState('aiken');
-                    const [isSidebarOpen, setSidebarOpen] = useState(true);
-                    const xlsxReady = useXLSX();
-
-                    const menuItems = [
-                    {id: 'aiken', label: 'Calculadora V de Aiken', icon: Calculator },
-                    {id: 'cronbach', label: 'Alfa de Cronbach', icon: Activity },
-                    {id: 'ranges', label: 'Baremos y Rangos', icon: Table },
-                    {id: 'survey', label: 'Gestión de Encuesta', icon: FileSpreadsheet },
-                    {id: 'recode', label: 'Recodificador Likert', icon: ArrowLeftRight },
-                    ];
-
-                    return (
-                    <div className="min-h-screen bg-slate-100 flex font-sans text-slate-900">
-                        {/* Sidebar */}
-                        <aside
-                            className={`${isSidebarOpen ? 'w-64' : 'w-20'} bg-slate-900 text-white transition-all duration-300 flex flex-col sticky top-0 h-screen z-30 shadow-xl`}
-                        >
-                            <div className="p-4 flex items-center justify-between border-b border-slate-800">
-                                {isSidebarOpen && <span className="font-bold text-xl tracking-tight">PsychSuite</span>}
-                                <button onClick={() => setSidebarOpen(!isSidebarOpen)} className="p-1 hover:bg-slate-800 rounded">
-                                    {isSidebarOpen ? <X size={20} /> : <Menu size={20} />}
-                                </button>
-                            </div>
-
-                            <nav className="flex-1 py-6 px-2 space-y-2">
-                                {menuItems.map(item => (
-                                    <button
-                                        key={item.id}
-                                        onClick={() => setActiveTab(item.id)}
-                                        className={`w-full flex items-center p-3 rounded-lg transition-colors ${activeTab === item.id
-                                            ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20'
-                                            : 'text-slate-400 hover:bg-slate-800 hover:text-white'
-                                            }`}
-                                    >
-                                        <item.icon size={20} className={`${isSidebarOpen ? 'mr-3' : 'mx-auto'}`} />
-                                        {isSidebarOpen && <span className="font-medium">{item.label}</span>}
-                                    </button>
-                                ))}
-                            </nav>
-
-                            <div className="p-4 border-t border-slate-800">
-                                <div className={`flex items-center ${!isSidebarOpen ? 'justify-center' : ''}`}>
-                                    <div className={`w-2 h-2 rounded-full mr-2 ${xlsxReady ? 'bg-green-500' : 'bg-yellow-500'}`}></div>
-                                    {isSidebarOpen && <span className="text-xs text-slate-400">{xlsxReady ? 'Sistema Listo' : 'Cargando libs...'}</span>}
-                                </div>
-                            </div>
-                        </aside>
-
-                        {/* Main Content */}
-                        <main className="flex-1 p-4 lg:p-8 overflow-y-auto h-screen">
-                            <div className="max-w-7xl mx-auto">
-                                <header className="mb-8">
-                                    <h1 className="text-3xl font-bold text-slate-800">
-                                        {menuItems.find(i => i.id === activeTab)?.label}
-                                    </h1>
-                                    <p className="text-slate-500 mt-1">Herramienta de análisis psicométrico profesional</p>
-                                </header>
-
-                                <div className="animate-in fade-in duration-500">
-                                    {activeTab === 'aiken' && <AikenCalculator xlsxReady={xlsxReady} />}
-                                    {activeTab === 'cronbach' && <CronbachAlpha xlsxReady={xlsxReady} />}
-                                    {activeTab === 'ranges' && <RangeCalculator />}
-                                    {activeTab === 'survey' && <SurveyConfig xlsxReady={xlsxReady} />}
-                                    {activeTab === 'recode' && <LikertRecoder xlsxReady={xlsxReady} />}
-                                </div>
-                            </div>
-                        </main>
-                    </div>
-                    );
+                </div>
+            )}
+        </div>
+    );
 };
 
-                    export default App;
+// --- HERRAMIENTA 5: ALFA DE CRONBACH ---
+
+const CronbachAlpha = ({ xlsxReady }) => {
+    // Estados
+    const [step, setStep] = useState('upload'); // upload | selection | global | individual
+    const [rawData, setRawData] = useState({ headers: [], rows: [] });
+
+    // Estados para Modo Global
+    const [globalCols, setGlobalCols] = useState([]);
+    const [globalResult, setGlobalResult] = useState(null);
+
+    // Estados para Modo Individual
+    const [variables, setVariables] = useState([{ id: 1, name: 'Variable 1', cols: [] }]);
+    const [individualResult, setIndividualResult] = useState(null);
+
+    // Función auxiliar: Calcular Varianza
+    const calculateVariance = (arr) => {
+        const n = arr.length;
+        if (n < 2) return 0;
+        const mean = arr.reduce((a, b) => a + b, 0) / n;
+        return arr.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / (n - 1);
+    };
+
+    // Función auxiliar: Calcular Alfa de Cronbach
+    const computeAlpha = (colIndices) => {
+        if (colIndices.length < 2) return 0;
+
+        const K = colIndices.length;
+        let sumItemVariances = 0;
+
+        // Varianza de cada ítem
+        colIndices.forEach(colIdx => {
+            const colValues = rawData.rows.map(row => row[colIdx]);
+            sumItemVariances += calculateVariance(colValues);
+        });
+
+        // Varianza del total
+        const totalScores = rawData.rows.map(row => {
+            return colIndices.reduce((sum, colIdx) => sum + row[colIdx], 0);
+        });
+        const totalVariance = calculateVariance(totalScores);
+
+        if (totalVariance === 0) return 0;
+
+        return (K / (K - 1)) * (1 - (sumItemVariances / totalVariance));
+    };
+
+    // 1. Manejo de Archivo
+    const handleFileUpload = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (evt) => {
+            const wb = XLSX.read(evt.target.result, { type: 'binary' });
+            const ws = wb.Sheets[wb.SheetNames[0]];
+            const json = XLSX.utils.sheet_to_json(ws, { header: 1 });
+
+            if (json.length > 1) {
+                const firstRow = json[0];
+                // Detectar si la primera fila son strings (headers)
+                const hasHeaders = firstRow.some(c => typeof c === 'string' && isNaN(Number(c)));
+
+                let headers, dataStartRow;
+
+                if (hasHeaders) {
+                    headers = firstRow;
+                    dataStartRow = 1;
+                } else {
+                    headers = firstRow.map((_, i) => `Columna ${i + 1}`);
+                    dataStartRow = 0;
+                }
+
+                const dataRows = json.slice(dataStartRow).map(row => {
+                    return Array.from({ length: headers.length }).map((_, i) => {
+                        const val = parseFloat(row[i]);
+                        return isNaN(val) ? 0 : val;
+                    });
+                });
+
+                setRawData({ headers, rows: dataRows });
+                setStep('selection');
+
+                // Pre-seleccionar todas para global por defecto
+                setGlobalCols(headers.map((_, i) => i));
+            }
+        };
+        reader.readAsBinaryString(file);
+    };
+
+    // 2. Lógica Global
+    const calculateGlobal = () => {
+        const alpha = computeAlpha(globalCols);
+        setGlobalResult({
+            items: globalCols.length,
+            alpha: alpha
+        });
+    };
+
+    const toggleGlobalCol = (idx) => {
+        if (globalCols.includes(idx)) {
+            setGlobalCols(globalCols.filter(c => c !== idx));
+        } else {
+            setGlobalCols([...globalCols, idx]);
+        }
+    };
+
+    // 3. Lógica Individual
+    const addVariable = () => {
+        setVariables([...variables, { id: Date.now(), name: `Variable ${variables.length + 1}`, cols: [] }]);
+    };
+    const removeVariable = (id) => setVariables(variables.filter(v => v.id !== id));
+    const updateVariableName = (id, name) => setVariables(variables.map(v => v.id === id ? { ...v, name } : v));
+    const toggleVarCol = (varId, colIdx) => {
+        setVariables(variables.map(v => {
+            if (v.id === varId) {
+                const newCols = v.cols.includes(colIdx)
+                    ? v.cols.filter(c => c !== colIdx)
+                    : [...v.cols, colIdx];
+                return { ...v, cols: newCols.sort((a, b) => a - b) };
+            }
+            return v;
+        }));
+    };
+
+    const calculateIndividual = () => {
+        const indResults = variables.map(v => ({
+            id: v.id,
+            name: v.name,
+            items: v.cols.length,
+            alpha: computeAlpha(v.cols)
+        }));
+        setIndividualResult(indResults);
+    };
+
+    // --- RENDERIZADO ---
+
+    if (step === 'upload') {
+        return (
+            <Card className="p-10 flex flex-col items-center justify-center min-h-[400px] border-2 border-dashed">
+                <div className="w-16 h-16 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mb-4">
+                    <Upload size={32} />
+                </div>
+                <h2 className="text-xl font-bold text-slate-800 mb-2">Sube tus datos</h2>
+                <p className="text-slate-500 text-center max-w-md mb-6">
+                    Carga un archivo Excel (.xlsx). El sistema detectará automáticamente si la primera fila contiene encabezados.
+                </p>
+                <div className="relative">
+                    <input
+                        type="file"
+                        accept=".xlsx"
+                        onChange={handleFileUpload}
+                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                        disabled={!xlsxReady}
+                    />
+                    <Button icon={Upload} disabled={!xlsxReady}>Seleccionar Archivo</Button>
+                </div>
+            </Card>
+        );
+    }
+
+    if (step === 'selection') {
+        return (
+            <div className="space-y-6 animate-in fade-in zoom-in duration-300">
+                <div className="flex items-center gap-4">
+                     <button onClick={() => setStep('upload')} className="p-2 hover:bg-slate-200 rounded-full text-slate-500">
+                        <ArrowLeft size={24} />
+                     </button>
+                     <h2 className="text-2xl font-bold text-slate-800">Elige tu Análisis</h2>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <button
+                        onClick={() => setStep('global')}
+                        className="group p-8 bg-white rounded-2xl border-2 border-slate-200 hover:border-blue-500 hover:shadow-xl transition-all text-left flex flex-col gap-4"
+                    >
+                        <div className="w-12 h-12 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center group-hover:scale-110 transition-transform">
+                            <Activity size={24} />
+                        </div>
+                        <div>
+                            <h3 className="text-xl font-bold text-slate-800 mb-2">Opción 1: Alfa Total</h3>
+                            <p className="text-slate-500 text-sm">
+                                Ideal si ya tienes tus variables sumadas en columnas (ej. "Suma Var1", "Suma Var2") y quieres calcular la consistencia interna global.
+                            </p>
+                        </div>
+                        <div className="mt-auto pt-4 text-blue-600 font-medium text-sm flex items-center">
+                            Configurar <ArrowLeftRight size={16} className="ml-2" />
+                        </div>
+                    </button>
+
+                    <button
+                        onClick={() => setStep('individual')}
+                        className="group p-8 bg-white rounded-2xl border-2 border-slate-200 hover:border-purple-500 hover:shadow-xl transition-all text-left flex flex-col gap-4"
+                    >
+                        <div className="w-12 h-12 rounded-lg bg-purple-100 text-purple-600 flex items-center justify-center group-hover:scale-110 transition-transform">
+                            <Settings size={24} />
+                        </div>
+                        <div>
+                            <h3 className="text-xl font-bold text-slate-800 mb-2">Opción 2: Alfa Individual</h3>
+                            <p className="text-slate-500 text-sm">
+                                Para análisis detallado. Define variables y asigna múltiples columnas (ítems) a cada una para calcular sus alfas por separado.
+                            </p>
+                        </div>
+                        <div className="mt-auto pt-4 text-purple-600 font-medium text-sm flex items-center">
+                            Configurar <ArrowLeftRight size={16} className="ml-2" />
+                        </div>
+                    </button>
+                </div>
+            </div>
+        );
+    }
+
+    if (step === 'global') {
+        return (
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 animate-in slide-in-from-right-8">
+                {/* Sidebar Selección */}
+                <div className="lg:col-span-4 space-y-6">
+                    <Card className="p-5 h-full flex flex-col">
+                        <div className="flex items-center gap-2 mb-4 border-b pb-2">
+                             <button onClick={() => setStep('selection')} className="text-slate-400 hover:text-slate-600"><ArrowLeft size={20}/></button>
+                             <h3 className="font-bold text-slate-800">Selección de Variables</h3>
+                        </div>
+                        <p className="text-xs text-slate-500 mb-4">Selecciona las columnas que actuarán como "ítems" para el cálculo global.</p>
+
+                        <div className="flex-1 overflow-y-auto border rounded-lg p-2 bg-slate-50 space-y-1">
+                            {rawData.headers.map((h, idx) => (
+                                <label key={idx} className="flex items-center space-x-3 p-2 bg-white rounded border cursor-pointer hover:bg-blue-50">
+                                    <input
+                                        type="checkbox"
+                                        checked={globalCols.includes(idx)}
+                                        onChange={() => toggleGlobalCol(idx)}
+                                        className="rounded text-blue-600 focus:ring-blue-500 h-4 w-4"
+                                    />
+                                    <span className="text-sm text-slate-700 font-medium truncate">{h}</span>
+                                </label>
+                            ))}
+                        </div>
+
+                        <div className="mt-4 pt-4 border-t">
+                            <div className="flex justify-between text-sm text-slate-600 mb-2">
+                                <span>Seleccionadas:</span>
+                                <span className="font-bold">{globalCols.length}</span>
+                            </div>
+                            <Button onClick={calculateGlobal} disabled={globalCols.length < 2} className="w-full">
+                                Calcular Alfa Total
+                            </Button>
+                            {globalCols.length < 2 && (
+                                <p className="text-xs text-center text-red-400 mt-2">Selecciona al menos 2 columnas.</p>
+                            )}
+                        </div>
+                    </Card>
+                </div>
+
+                {/* Resultados */}
+                <div className="lg:col-span-8">
+                    {globalResult ? (
+                        <Card className="p-8 flex flex-col items-center justify-center h-full bg-slate-900 text-white shadow-xl">
+                            <Activity size={64} className="mb-6 text-blue-400 opacity-80" />
+                            <h2 className="text-2xl font-bold mb-2">Alfa de Cronbach Total</h2>
+                            <div className="text-6xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400 mb-4">
+                                {globalResult.alpha.toFixed(3)}
+                            </div>
+                            <div className="flex gap-4 text-sm text-slate-400">
+                                <span className="px-3 py-1 bg-slate-800 rounded-full border border-slate-700">Variables/Ítems: {globalResult.items}</span>
+                                <span className="px-3 py-1 bg-slate-800 rounded-full border border-slate-700">
+                                    Interpretación: {
+                                        globalResult.alpha >= 0.9 ? 'Excelente' :
+                                        globalResult.alpha >= 0.8 ? 'Bueno' :
+                                        globalResult.alpha >= 0.7 ? 'Aceptable' :
+                                        globalResult.alpha >= 0.6 ? 'Cuestionable' : 'Pobre'
+                                    }
+                                </span>
+                            </div>
+                        </Card>
+                    ) : (
+                        <div className="h-full flex items-center justify-center text-slate-400 border-2 border-dashed rounded-xl bg-slate-50">
+                            <p>Selecciona variables y calcula para ver el resultado</p>
+                        </div>
+                    )}
+                </div>
+            </div>
+        );
+    }
+
+    if (step === 'individual') {
+        return (
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 animate-in slide-in-from-right-8">
+                 {/* Configuración */}
+                <div className="lg:col-span-4 space-y-6">
+                    <Card className="p-5 h-full flex flex-col">
+                         <div className="flex items-center gap-2 mb-4 border-b pb-2">
+                             <button onClick={() => setStep('selection')} className="text-slate-400 hover:text-slate-600"><ArrowLeft size={20}/></button>
+                             <h3 className="font-bold text-slate-800">Configuración Variables</h3>
+                        </div>
+                        <p className="text-xs text-slate-500 mb-4">Crea variables y asígnales sus ítems correspondientes.</p>
+
+                        <div className="flex-1 overflow-y-auto space-y-4 pr-1">
+                            {variables.map((v) => (
+                                <div key={v.id} className="bg-slate-50 p-3 rounded-lg border border-slate-200">
+                                    <div className="flex justify-between items-center mb-2">
+                                        <input
+                                            type="text"
+                                            value={v.name}
+                                            onChange={(e) => updateVariableName(v.id, e.target.value)}
+                                            className="font-bold text-sm bg-transparent border-b border-transparent hover:border-slate-300 focus:border-purple-500 focus:outline-none w-full mr-2"
+                                        />
+                                        <button onClick={() => removeVariable(v.id)} className="text-slate-400 hover:text-red-500">
+                                            <Trash2 size={16} />
+                                        </button>
+                                    </div>
+                                    <div className="max-h-32 overflow-y-auto bg-white p-2 rounded border grid grid-cols-2 gap-1">
+                                        {rawData.headers.map((h, idx) => (
+                                            <label key={idx} className="flex items-center space-x-2 cursor-pointer hover:bg-purple-50 p-1 rounded">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={v.cols.includes(idx)}
+                                                    onChange={() => toggleVarCol(v.id, idx)}
+                                                    className="rounded text-purple-600 focus:ring-purple-500 h-3 w-3"
+                                                />
+                                                <span className="text-[10px] truncate" title={h}>{h}</span>
+                                            </label>
+                                        ))}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+
+                        <div className="mt-4 pt-4 border-t space-y-2">
+                            <Button variant="outline" onClick={addVariable} className="w-full text-sm">
+                                <Plus size={14} className="mr-1" /> Añadir Variable
+                            </Button>
+                            <Button onClick={calculateIndividual} className="w-full bg-purple-600 hover:bg-purple-700">
+                                Calcular Alfas
+                            </Button>
+                        </div>
+                    </Card>
+                </div>
+
+                {/* Resultados */}
+                <div className="lg:col-span-8">
+                    {individualResult ? (
+                        <Card className="p-0 overflow-hidden">
+                             <div className="bg-purple-900 text-white p-4 font-bold flex justify-between">
+                                <span>Resultados Individuales</span>
+                            </div>
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-sm text-left">
+                                    <thead className="bg-slate-50 text-slate-700">
+                                        <tr>
+                                            <th className="p-4 border-b">Variable</th>
+                                            <th className="p-4 border-b text-center">Ítems (Columnas)</th>
+                                            <th className="p-4 border-b text-center">Alfa de Cronbach</th>
+                                            <th className="p-4 border-b text-right">Interpretación</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-100">
+                                        {individualResult.map((res) => (
+                                            <tr key={res.id} className="hover:bg-slate-50">
+                                                <td className="p-4 font-medium text-slate-700">{res.name}</td>
+                                                <td className="p-4 text-center">
+                                                    <span className="bg-slate-100 px-2 py-1 rounded text-slate-600 text-xs">{res.items}</span>
+                                                </td>
+                                                <td className="p-4 text-center font-bold text-purple-600 text-lg">
+                                                    {isNaN(res.alpha) ? 'N/A' : res.alpha.toFixed(3)}
+                                                </td>
+                                                <td className="p-4 text-right">
+                                                    <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+                                                        res.alpha >= 0.8 ? 'bg-emerald-100 text-emerald-700' :
+                                                        res.alpha >= 0.7 ? 'bg-blue-100 text-blue-700' :
+                                                        'bg-orange-100 text-orange-700'
+                                                    }`}>
+                                                        {res.alpha >= 0.9 ? 'Excelente' :
+                                                         res.alpha >= 0.8 ? 'Bueno' :
+                                                         res.alpha >= 0.7 ? 'Aceptable' : 'Bajo'}
+                                                    </span>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </Card>
+                    ) : (
+                         <div className="h-full flex items-center justify-center text-slate-400 border-2 border-dashed rounded-xl bg-slate-50">
+                            <p>Configura tus variables y calcula</p>
+                        </div>
+                    )}
+                </div>
+            </div>
+        );
+    }
+};
+
+const App = () => {
+    const [activeTab, setActiveTab] = useState('aiken');
+    const [isSidebarOpen, setSidebarOpen] = useState(true);
+    const xlsxReady = useXLSX();
+
+    const menuItems = [
+        {id: 'aiken', label: 'Calculadora V de Aiken', icon: Calculator },
+        {id: 'cronbach', label: 'Alfa de Cronbach', icon: Activity },
+        {id: 'ranges', label: 'Baremos y Rangos', icon: Table },
+        {id: 'survey', label: 'Gestión de Encuesta', icon: FileSpreadsheet },
+        {id: 'recode', label: 'Recodificador Likert', icon: ArrowLeftRight },
+    ];
+
+    return (
+        <div className="min-h-screen bg-slate-100 flex font-sans text-slate-900">
+            {/* Sidebar */}
+            <aside
+                className={`${isSidebarOpen ? 'w-64' : 'w-20'} bg-slate-900 text-white transition-all duration-300 flex flex-col sticky top-0 h-screen z-30 shadow-xl`}
+            >
+                <div className="p-4 flex items-center justify-between border-b border-slate-800">
+                    {isSidebarOpen && <span className="font-bold text-xl tracking-tight">PsychSuite</span>}
+                    <button onClick={() => setSidebarOpen(!isSidebarOpen)} className="p-1 hover:bg-slate-800 rounded">
+                        {isSidebarOpen ? <X size={20} /> : <Menu size={20} />}
+                    </button>
+                </div>
+
+                <nav className="flex-1 py-6 px-2 space-y-2">
+                    {menuItems.map(item => (
+                        <button
+                            key={item.id}
+                            onClick={() => setActiveTab(item.id)}
+                            className={`w-full flex items-center p-3 rounded-lg transition-colors ${activeTab === item.id
+                                ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20'
+                                : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                                }`}
+                        >
+                            <item.icon size={20} className={`${isSidebarOpen ? 'mr-3' : 'mx-auto'}`} />
+                            {isSidebarOpen && <span className="font-medium">{item.label}</span>}
+                        </button>
+                    ))}
+                </nav>
+
+                <div className="p-4 border-t border-slate-800">
+                    <div className={`flex items-center ${!isSidebarOpen ? 'justify-center' : ''}`}>
+                        <div className={`w-2 h-2 rounded-full mr-2 ${xlsxReady ? 'bg-green-500' : 'bg-yellow-500'}`}></div>
+                        {isSidebarOpen && <span className="text-xs text-slate-400">{xlsxReady ? 'Sistema Listo' : 'Cargando libs...'}</span>}
+                    </div>
+                </div>
+            </aside>
+
+            {/* Main Content */}
+            <main className="flex-1 p-4 lg:p-8 overflow-y-auto h-screen">
+                <div className="max-w-7xl mx-auto">
+                    <header className="mb-8">
+                        <h1 className="text-3xl font-bold text-slate-800">
+                            {menuItems.find(i => i.id === activeTab)?.label}
+                        </h1>
+                        <p className="text-slate-500 mt-1">Herramienta de análisis psicométrico profesional</p>
+                    </header>
+
+                    <div className="animate-in fade-in duration-500">
+                        {activeTab === 'aiken' && <AikenCalculator xlsxReady={xlsxReady} />}
+                        {activeTab === 'cronbach' && <CronbachAlpha xlsxReady={xlsxReady} />}
+                        {activeTab === 'ranges' && <RangeCalculator />}
+                        {activeTab === 'survey' && <SurveyConfig xlsxReady={xlsxReady} />}
+                        {activeTab === 'recode' && <LikertRecoder xlsxReady={xlsxReady} />}
+                    </div>
+                </div>
+            </main>
+        </div>
+    );
+};
+
+export default App;
