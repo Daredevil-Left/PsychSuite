@@ -1,0 +1,564 @@
+﻿diff --git a/src/App.jsx b/src/App.jsx
+index 8566500..03583bf 100644
+--- a/src/App.jsx
++++ b/src/App.jsx
+@@ -1331,85 +1331,492 @@ const LikertRecoder = ({ xlsxReady }) => {
+                                     </tr>
+                                 </thead>
+                                 <tbody>
+-                                    {recodedRows.slice(0, 50).map((r, i) => (
+-                                        <tr key={i}>
+-                                            {r.map((c, j) => <td key={j} className={`p-1 border ${selectedCols.has(j) ? 'bg-emerald-50 font-bold text-emerald-700' : ''}`}>{c}</td>)}
+-                                        </tr>
++                                    <tr key={i}>
++                                        {r.map((c, j) => <td key={j} className={`p-1 border ${selectedCols.has(j) ? 'bg-emerald-50 font-bold text-emerald-700' : ''}`}>{c}</td>)}
++                                    </tr>
+                                     ))}
+                                 </tbody>
+                             </table>
+                         </div>
+                     </Card>
+-                    const [activeTab, setActiveTab] = useState('aiken');
+-                    const [isSidebarOpen, setSidebarOpen] = useState(true);
+-                    const xlsxReady = useXLSX();
+-
+-                    const menuItems = [
+-                    {id: 'aiken', label: 'Calculadora V de Aiken', icon: Calculator },
+-                    {id: 'cronbach', label: 'Alfa de Cronbach', icon: Activity },
+-                    {id: 'ranges', label: 'Baremos y Rangos', icon: Table },
+-                    {id: 'survey', label: 'Gesti├│n de Encuesta', icon: FileSpreadsheet },
+-                    {id: 'recode', label: 'Recodificador Likert', icon: ArrowLeftRight },
+-                    ];
+-
+-                    return (
+-                    <div className="min-h-screen bg-slate-100 flex font-sans text-slate-900">
+-                        {/* Sidebar */}
+-                        <aside
+-                            className={`${isSidebarOpen ? 'w-64' : 'w-20'} bg-slate-900 text-white transition-all duration-300 flex flex-col sticky top-0 h-screen z-30 shadow-xl`}
+-                        >
+-                            <div className="p-4 flex items-center justify-between border-b border-slate-800">
+-                                {isSidebarOpen && <span className="font-bold text-xl tracking-tight">PsychSuite</span>}
+-                                <button onClick={() => setSidebarOpen(!isSidebarOpen)} className="p-1 hover:bg-slate-800 rounded">
+-                                    {isSidebarOpen ? <X size={20} /> : <Menu size={20} />}
+-                                </button>
++                </div>
++            )}
++        </div>
++    );
++};
++
++// --- HERRAMIENTA 5: ALFA DE CRONBACH ---
++
++const CronbachAlpha = ({ xlsxReady }) => {
++    const [mode, setMode] = useState('global'); // 'global' | 'multi'
++    const [variables, setVariables] = useState([]);
++    const [totalCols, setTotalCols] = useState(0);
++    const [surveyData, setSurveyData] = useState([]);
++    const [results, setResults] = useState(null);
++    const [copySuccess, setCopySuccess] = useState(false);
++
++    // Al cargar archivo, detectamos columnas
++    const handleFileUpload = (e) => {
++        const file = e.target.files[0];
++        if (!file) return;
++
++        const reader = new FileReader();
++        reader.onload = (evt) => {
++            const wb = XLSX.read(evt.target.result, { type: 'binary' });
++            const ws = wb.Sheets[wb.SheetNames[0]];
++            const json = XLSX.utils.sheet_to_json(ws, { header: 1 });
++
++            if (json.length > 1) {
++                const detectedCols = json[0].length;
++                setTotalCols(detectedCols);
++
++                // Procesar datos (asumimos fila 1 headers)
++                const dataRows = json.slice(1).map(row => {
++                    // Asegurar que todas las filas tengan el mismo largo rellenando con 0 si falta
++                    const fullRow = Array(detectedCols).fill(0);
++                    row.forEach((val, idx) => {
++                        if (idx < detectedCols) fullRow[idx] = parseFloat(val) || 0;
++                    });
++                    return fullRow;
++                });
++                setSurveyData(dataRows);
++                setResults(null);
++                setVariables([]); // Reset variables on new file
++            } else {
++                alert("El archivo parece vac├¡o.");
++            }
++        };
++        reader.readAsBinaryString(file);
++    };
++
++    const addVariable = () => {
++        const nextId = variables.length + 1;
++        // Sugerir rango basado en el anterior
++        let start = 1;
++        if (variables.length > 0) {
++            start = variables[variables.length - 1].end + 1;
++        }
++        if (start > totalCols) start = totalCols;
++
++        setVariables([...variables, {
++            id: Date.now(),
++            name: `Variable ${nextId}`,
++            start: start,
++            end: start // Default to single col
++        }]);
++    };
++
++    const updateVariable = (id, field, val) => {
++        setVariables(variables.map(v => {
++            if (v.id === id) {
++                let newVal = val;
++                if (field === 'start' || field === 'end') {
++                    newVal = parseInt(val) || 0;
++                }
++                return { ...v, [field]: newVal };
++            }
++            return v;
++        }));
++    };
++
++    const removeVariable = (id) => {
++        setVariables(variables.filter(v => v.id !== id));
++    };
++
++    const getInterpretation = (alpha) => {
++        if (alpha >= 0.81) return { text: "Muy alta", color: "text-green-700 bg-green-100" };
++        if (alpha >= 0.61) return { text: "Alta", color: "text-emerald-700 bg-emerald-100" };
++        if (alpha >= 0.41) return { text: "Media*", color: "text-yellow-700 bg-yellow-100" };
++        if (alpha >= 0.21) return { text: "Baja*", color: "text-orange-700 bg-orange-100" };
++        return { text: "Muy baja*", color: "text-red-700 bg-red-100" };
++    };
++
++    const calculateAlphaForSubset = (data, startCol, endCol) => {
++        // Indices 0-based, inputs 1-based
++        const start = Math.max(0, startCol - 1);
++        const end = Math.min(data[0].length, endCol); // slice is exclusive of end, so endCol is correct index
++
++        const nItems = end - start;
++        if (nItems < 2) return null; // Need at least 2 items
++
++        const nSubjects = data.length;
++
++        // 1. Varianza ├¡tems
++        let sumItemVariances = 0;
++        for (let i = start; i < end; i++) {
++            const itemScores = data.map(r => r[i]);
++            const mean = itemScores.reduce((a, b) => a + b, 0) / nSubjects;
++            const variance = itemScores.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / (nSubjects - 1);
++            sumItemVariances += variance;
++        }
++
++        // 2. Varianza total
++        const totalScores = data.map(row => {
++            let sum = 0;
++            for (let i = start; i < end; i++) sum += row[i];
++            return sum;
++        });
++        const totalMean = totalScores.reduce((a, b) => a + b, 0) / nSubjects;
++        const totalVariance = totalScores.reduce((a, b) => a + Math.pow(b - totalMean, 2), 0) / (nSubjects - 1);
++
++        // 3. Alfa
++        let alpha = 0;
++        if (totalVariance > 0) {
++            alpha = (nItems / (nItems - 1)) * (1 - (sumItemVariances / totalVariance));
++        }
++
++        return {
++            items: nItems,
++            alpha: alpha,
++            interpretation: getInterpretation(alpha)
++        };
++    };
++
++    const calculate = () => {
++        if (surveyData.length === 0) return;
++
++        let newResults = [];
++
++        if (mode === 'global') {
++            const res = calculateAlphaForSubset(surveyData, 1, totalCols);
++            if (res) {
++                newResults.push({ name: "Escala General", ...res });
++            } else {
++                alert("No se pudo calcular. Aseg├║rate de tener al menos 2 columnas.");
++            }
++        } else {
++            // Multi variable
++            if (variables.length === 0) {
++                alert("Define al menos una variable.");
++                return;
++            }
++
++            variables.forEach(v => {
++                const res = calculateAlphaForSubset(surveyData, v.start, v.end);
++                if (res) {
++                    newResults.push({ name: v.name, ...res });
++                } else {
++                    newResults.push({ name: v.name, error: "Rango inv├ílido (<2 ├¡tems)" });
++                }
++            });
++        }
++
++        setResults(newResults);
++    };
++
++    const copyAPA7 = () => {
++        if (!results) return;
++
++        let rowsHTML = results.map(r => {
++            if (r.error) return '';
++            return `
++                <tr>
++                    <td>${r.name}</td>
++                    <td style="text-align:center">${r.items}</td>
++                    <td style="text-align:center">${r.alpha.toFixed(3)}</td>
++                    <td>${r.interpretation.text}</td>
++                </tr>
++            `;
++        }).join('');
++
++        let tableHTML = `
++            <style>
++                table { border-collapse: collapse; width: 100%; font-family: "Times New Roman", serif; font-size: 12pt; }
++                th, td { padding: 8px; text-align: left; border: 0; }
++                thead th { border-bottom: 1px solid black; border-top: 1px solid black; }
++                tbody tr:last-child td { border-bottom: 1px solid black; }
++                caption { text-align: left; font-weight: bold; margin-bottom: 10px; }
++                .note { font-size: 10pt; margin-top: 5px; font-style: italic; }
++            </style>
++            <table>
++                <caption>Tabla 2<br><span style="font-weight:normal; font-style:italic">Coeficientes de consistencia interna Alfa de Cronbach</span></caption>
++                <thead>
++                    <tr>
++                        <th>Variable</th>
++                        <th style="text-align:center">N┬░ Elementos</th>
++                        <th style="text-align:center">╬▒</th>
++                        <th>Interpretaci├│n</th>
++                    </tr>
++                </thead>
++                <tbody>
++                    ${rowsHTML}
++                </tbody>
++            </table>
++            <div class="note">Nota. Interpretaci├│n basada en Palella y Martins (2012).</div>
++        `;
++
++        const type = "text/html";
++        const blob = new Blob([tableHTML], { type });
++        const data = [new ClipboardItem({ [type]: blob })];
++        navigator.clipboard.write(data).then(() => setCopySuccess(true));
++    };
++
++    useEffect(() => {
++        if (copySuccess) {
++            const timer = setTimeout(() => setCopySuccess(false), 2000);
++            return () => clearTimeout(timer);
++        }
++    }, [copySuccess]);
++
++    return (
++        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
++            {/* Configuraci├│n */}
++            <div className="lg:col-span-5 space-y-6">
++                <Card className="p-5">
++                    <h3 className="font-bold text-slate-800 mb-4 flex items-center">
++                        <Settings className="w-5 h-5 mr-2 text-blue-600" /> Configuraci├│n de An├ílisis
++                    </h3>
++
++                    {/* 1. Carga */}
++                    <div className="mb-6">
++                        <label className="block text-sm font-bold text-slate-700 mb-2">1. Cargar Datos</label>
++                        <div className="relative">
++                            <input type="file" accept=".xlsx" onChange={handleFileUpload} className="absolute inset-0 w-full opacity-0 cursor-pointer" disabled={!xlsxReady} />
++                            <div className={`border-2 border-dashed rounded-lg p-4 text-center transition-colors cursor-pointer ${surveyData.length > 0 ? 'border-green-300 bg-green-50' : 'border-slate-300 hover:bg-slate-50'}`}>
++                                {surveyData.length > 0 ? (
++                                    <div className="text-green-700">
++                                        <CheckCircle className="mx-auto mb-1" size={24} />
++                                        <span className="font-bold text-sm">Datos Cargados</span>
++                                        <p className="text-xs mt-1">{surveyData.length} filas, {totalCols} columnas detectadas</p>
++                                    </div>
++                                ) : (
++                                    <div className="text-slate-500">
++                                        <Upload className="mx-auto mb-1" size={24} />
++                                        <span className="text-sm">Seleccionar Excel (.xlsx)</span>
++                                    </div>
++                                )}
+                             </div>
++                        </div>
++                    </div>
+ 
+-                            <nav className="flex-1 py-6 px-2 space-y-2">
+-                                {menuItems.map(item => (
+-                                    <button
+-                                        key={item.id}
+-                                        onClick={() => setActiveTab(item.id)}
+-                                        className={`w-full flex items-center p-3 rounded-lg transition-colors ${activeTab === item.id
+-                                            ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20'
+-                                            : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+-                                            }`}
+-                                    >
+-                                        <item.icon size={20} className={`${isSidebarOpen ? 'mr-3' : 'mx-auto'}`} />
+-                                        {isSidebarOpen && <span className="font-medium">{item.label}</span>}
+-                                    </button>
+-                                ))}
+-                            </nav>
++                    {/* 2. Modo */}
++                    {surveyData.length > 0 && (
++                        <div className="animate-in fade-in slide-in-from-top-2 space-y-6">
++                            <div>
++                                <label className="block text-sm font-bold text-slate-700 mb-2">2. Tipo de An├ílisis</label>
++                                <div className="flex gap-4">
++                                    <label className={`flex-1 p-3 border rounded-lg cursor-pointer transition-all ${mode === 'global' ? 'bg-blue-50 border-blue-500 ring-1 ring-blue-500' : 'hover:bg-slate-50'}`}>
++                                        <input type="radio" name="mode" value="global" checked={mode === 'global'} onChange={() => setMode('global')} className="sr-only" />
++                                        <div className="text-center">
++                                            <span className="block font-bold text-sm text-slate-800">Global</span>
++                                            <span className="text-xs text-slate-500">Todas las columnas (1-{totalCols})</span>
++                                        </div>
++                                    </label>
++                                    <label className={`flex-1 p-3 border rounded-lg cursor-pointer transition-all ${mode === 'multi' ? 'bg-blue-50 border-blue-500 ring-1 ring-blue-500' : 'hover:bg-slate-50'}`}>
++                                        <input type="radio" name="mode" value="multi" checked={mode === 'multi'} onChange={() => setMode('multi')} className="sr-only" />
++                                        <div className="text-center">
++                                            <span className="block font-bold text-sm text-slate-800">Por Variables</span>
++                                            <span className="text-xs text-slate-500">Definir rangos espec├¡ficos</span>
++                                        </div>
++                                    </label>
++                                </div>
++                            </div>
+ 
+-                            <div className="p-4 border-t border-slate-800">
+-                                <div className={`flex items-center ${!isSidebarOpen ? 'justify-center' : ''}`}>
+-                                    <div className={`w-2 h-2 rounded-full mr-2 ${xlsxReady ? 'bg-green-500' : 'bg-yellow-500'}`}></div>
+-                                    {isSidebarOpen && <span className="text-xs text-slate-400">{xlsxReady ? 'Sistema Listo' : 'Cargando libs...'}</span>}
++                            {/* 3. Definici├│n de Variables (Solo Multi) */}
++                            {mode === 'multi' && (
++                                <div>
++                                    <div className="flex justify-between items-center mb-2">
++                                        <label className="block text-sm font-bold text-slate-700">3. Definir Variables</label>
++                                        <button onClick={addVariable} className="text-xs flex items-center text-blue-600 font-bold hover:underline">
++                                            <Plus size={14} className="mr-1" /> Agregar
++                                        </button>
++                                    </div>
++                                    <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1">
++                                        {variables.map((v, idx) => (
++                                            <div key={v.id} className="bg-slate-50 p-2 rounded border flex items-center gap-2 text-sm">
++                                                <span className="font-bold text-slate-400 w-4">{idx + 1}.</span>
++                                                <input
++                                                    type="text"
++                                                    value={v.name}
++                                                    onChange={(e) => updateVariable(v.id, 'name', e.target.value)}
++                                                    className="flex-1 p-1.5 border rounded outline-none focus:border-blue-500"
++                                                    placeholder="Nombre"
++                                                />
++                                                <div className="flex items-center gap-1">
++                                                    <span className="text-xs text-slate-500">Col:</span>
++                                                    <input
++                                                        type="number"
++                                                        value={v.start}
++                                                        onChange={(e) => updateVariable(v.id, 'start', e.target.value)}
++                                                        className="w-12 p-1.5 border rounded text-center outline-none focus:border-blue-500"
++                                                    />
++                                                    <span className="text-slate-400">-</span>
++                                                    <input
++                                                        type="number"
++                                                        value={v.end}
++                                                        onChange={(e) => updateVariable(v.id, 'end', e.target.value)}
++                                                        className="w-12 p-1.5 border rounded text-center outline-none focus:border-blue-500"
++                                                    />
++                                                </div>
++                                                <button onClick={() => removeVariable(v.id)} className="text-red-400 hover:text-red-600 p-1">
++                                                    <Trash2 size={16} />
++                                                </button>
++                                            </div>
++                                        ))}
++                                        {variables.length === 0 && (
++                                            <div className="text-center p-4 text-slate-400 text-xs italic border-2 border-dashed rounded">
++                                                Agrega variables para definir qu├® columnas analizar.
++                                            </div>
++                                        )}
++                                    </div>
+                                 </div>
++                            )}
++
++                            <Button variant="primary" onClick={calculate} className="w-full">
++                                <Activity size={18} className="mr-2" /> Calcular Alfa de Cronbach
++                            </Button>
++                        </div>
++                    )}
++                </Card>
++            </div>
++
++            {/* Resultados */}
++            <div className="lg:col-span-7 space-y-6">
++                {results ? (
++                    <Card className="p-0 overflow-hidden animate-in fade-in zoom-in-95">
++                        <div className="bg-slate-800 text-white p-4 flex justify-between items-center">
++                            <h3 className="font-bold flex items-center">
++                                <Activity className="mr-2" size={18} /> Resultados
++                            </h3>
++                            <div className="flex gap-2 items-center">
++                                {copySuccess && <span className="text-xs text-emerald-500 animate-pulse font-bold">┬íCopiado!</span>}
++                                <Button variant="secondary" icon={FileText} onClick={copyAPA7} className="text-xs">Copiar Tabla APA 7</Button>
+                             </div>
+-                        </aside>
+-
+-                        {/* Main Content */}
+-                        <main className="flex-1 p-4 lg:p-8 overflow-y-auto h-screen">
+-                            <div className="max-w-7xl mx-auto">
+-                                <header className="mb-8">
+-                                    <h1 className="text-3xl font-bold text-slate-800">
+-                                        {menuItems.find(i => i.id === activeTab)?.label}
+-                                    </h1>
+-                                    <p className="text-slate-500 mt-1">Herramienta de an├ílisis psicom├®trico profesional</p>
+-                                </header>
+-
+-                                <div className="animate-in fade-in duration-500">
+-                                    {activeTab === 'aiken' && <AikenCalculator xlsxReady={xlsxReady} />}
+-                                    {activeTab === 'cronbach' && <CronbachAlpha xlsxReady={xlsxReady} />}
+-                                    {activeTab === 'ranges' && <RangeCalculator />}
+-                                    {activeTab === 'survey' && <SurveyConfig xlsxReady={xlsxReady} />}
+-                                    {activeTab === 'recode' && <LikertRecoder xlsxReady={xlsxReady} />}
++                        </div>
++                        <div className="p-6">
++                            <table className="w-full text-sm text-left border rounded-lg overflow-hidden">
++                                <thead className="bg-slate-50 border-b">
++                                    <tr>
++                                        <th className="p-3 text-slate-600">Variable</th>
++                                        <th className="p-3 text-center text-slate-600">N┬░ Elementos</th>
++                                        <th className="p-3 text-center text-slate-600">Alfa (╬▒)</th>
++                                        <th className="p-3 text-slate-600">Interpretaci├│n</th>
++                                    </tr>
++                                </thead>
++                                <tbody className="divide-y">
++                                    {results.map((r, i) => (
++                                        <tr key={i}>
++                                            <td className="p-3 font-medium">{r.name}</td>
++                                            {r.error ? (
++                                                <td colSpan={3} className="p-3 text-red-500 text-xs italic">{r.error}</td>
++                                            ) : (
++                                                <>
++                                                    <td className="p-3 text-center text-slate-500">{r.items}</td>
++                                                    <td className="p-3 text-center font-bold text-slate-800">{r.alpha.toFixed(3)}</td>
++                                                    <td className="p-3">
++                                                        <span className={`px-2 py-1 rounded text-xs font-bold ${r.interpretation.color}`}>
++                                                            {r.interpretation.text}
++                                                        </span>
++                                                    </td>
++                                                </>
++                                            )}
++                                        </tr>
++                                    ))}
++                                </tbody>
++                            </table>
++
++                            <div className="mt-6 bg-slate-50 p-4 rounded-lg border border-slate-200">
++                                <h4 className="font-bold text-slate-700 mb-3 text-xs uppercase tracking-wide">Escala de Interpretaci├│n (Palella y Martins, 2012)</h4>
++                                <div className="grid grid-cols-2 gap-y-2 gap-x-4 text-xs text-slate-600">
++                                    <div className="flex justify-between"><span>0,81 - 1.00:</span> <span className="font-bold text-green-700">Muy alta</span></div>
++                                    <div className="flex justify-between"><span>0,61 - 0.80:</span> <span className="font-bold text-emerald-700">Alta</span></div>
++                                    <div className="flex justify-between"><span>0,41 - 0.60:</span> <span className="font-bold text-yellow-700">Media*</span></div>
++                                    <div className="flex justify-between"><span>0,21 - 0.40:</span> <span className="font-bold text-orange-700">Baja*</span></div>
++                                    <div className="flex justify-between"><span>0.00 - 0.20:</span> <span className="font-bold text-red-700">Muy baja*</span></div>
+                                 </div>
++                                <p className="text-[10px] text-slate-400 mt-3 italic border-t pt-2">
++                                    * Se sugiere repetir la validaci├│n del instrumento puesto que es recomendable que el resultado sea mayor a 0,61.
++                                </p>
+                             </div>
+-                        </main>
++                        </div>
++                    </Card>
++                ) : (
++                    <div className="h-full flex flex-col items-center justify-center text-slate-400 border-2 border-dashed border-slate-300 rounded-xl p-10 bg-slate-50/30">
++                        <Activity size={48} className="mb-4 opacity-20" />
++                        <p className="font-medium text-lg text-slate-600">Resultados del An├ílisis</p>
++                        <p className="max-w-sm text-center mt-2 text-sm">
++                            Configura el an├ílisis en el panel izquierdo y haz clic en "Calcular" para ver los resultados.
++                        </p>
+                     </div>
+-                    );
++                )}
++            </div>
++        </div>
++    );
++};
++
++// --- APP PRINCIPAL ---
++
++const App = () => {
++    const [activeTab, setActiveTab] = useState('aiken');
++    const [isSidebarOpen, setSidebarOpen] = useState(true);
++    const xlsxReady = useXLSX();
++
++    const menuItems = [
++        { id: 'aiken', label: 'Calculadora V de Aiken', icon: Calculator },
++        { id: 'cronbach', label: 'Alfa de Cronbach', icon: Activity },
++        { id: 'ranges', label: 'Baremos y Rangos', icon: Table },
++        { id: 'survey', label: 'Gesti├│n de Encuesta', icon: FileSpreadsheet },
++        { id: 'recode', label: 'Recodificador Likert', icon: ArrowLeftRight },
++    ];
++
++    return (
++        <div className="min-h-screen bg-slate-100 flex font-sans text-slate-900">
++            {/* Sidebar */}
++            <aside
++                className={`${isSidebarOpen ? 'w-64' : 'w-20'} bg-slate-900 text-white transition-all duration-300 flex flex-col sticky top-0 h-screen z-30 shadow-xl`}
++            >
++                <div className="p-4 flex items-center justify-between border-b border-slate-800">
++                    {isSidebarOpen && <span className="font-bold text-xl tracking-tight">PsychSuite</span>}
++                    <button onClick={() => setSidebarOpen(!isSidebarOpen)} className="p-1 hover:bg-slate-800 rounded">
++                        {isSidebarOpen ? <X size={20} /> : <Menu size={20} />}
++                    </button>
++                </div>
++
++                <nav className="flex-1 py-6 px-2 space-y-2">
++                    {menuItems.map(item => (
++                        <button
++                            key={item.id}
++                            onClick={() => setActiveTab(item.id)}
++                            className={`w-full flex items-center p-3 rounded-lg transition-colors ${activeTab === item.id
++                                ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20'
++                                : 'text-slate-400 hover:bg-slate-800 hover:text-white'
++                                }`}
++                        >
++                            <item.icon size={20} className={`${isSidebarOpen ? 'mr-3' : 'mx-auto'}`} />
++                            {isSidebarOpen && <span className="font-medium">{item.label}</span>}
++                        </button>
++                    ))}
++                </nav>
++
++                <div className="p-4 border-t border-slate-800">
++                    <div className={`flex items-center ${!isSidebarOpen ? 'justify-center' : ''}`}>
++                        <div className={`w-2 h-2 rounded-full mr-2 ${xlsxReady ? 'bg-green-500' : 'bg-yellow-500'}`}></div>
++                        {isSidebarOpen && <span className="text-xs text-slate-400">{xlsxReady ? 'Sistema Listo' : 'Cargando libs...'}</span>}
++                    </div>
++                </div>
++            </aside>
++
++            {/* Main Content */}
++            <main className="flex-1 p-4 lg:p-8 overflow-y-auto h-screen">
++                <div className="max-w-7xl mx-auto">
++                    <header className="mb-8">
++                        <h1 className="text-3xl font-bold text-slate-800">
++                            {menuItems.find(i => i.id === activeTab)?.label}
++                        </h1>
++                        <p className="text-slate-500 mt-1">Herramienta de an├ílisis psicom├®trico profesional</p>
++                    </header>
++
++                    <div className="animate-in fade-in duration-500">
++                        {activeTab === 'aiken' && <AikenCalculator xlsxReady={xlsxReady} />}
++                        {activeTab === 'cronbach' && <CronbachAlpha xlsxReady={xlsxReady} />}
++                        {activeTab === 'ranges' && <RangeCalculator />}
++                        {activeTab === 'survey' && <SurveyConfig xlsxReady={xlsxReady} />}
++                        {activeTab === 'recode' && <LikertRecoder xlsxReady={xlsxReady} />}
++                    </div>
++                </div>
++            </main>
++        </div>
++    );
+ };
+ 
+-                    export default App;
++export default App;

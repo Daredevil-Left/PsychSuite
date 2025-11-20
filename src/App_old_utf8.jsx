@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+﻿import React, { useState, useEffect, useRef, useMemo } from 'react';
 import * as XLSX from 'xlsx';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -20,15 +20,14 @@ import {
     X,
     RefreshCw,
     FileText,
-    Activity,
-    ArrowLeft
+    Activity
 } from 'lucide-react';
 
-// --- UTILIDADES Y CONFIGURACIÓN ---
+// --- UTILIDADES Y CONFIGURACI├ôN ---
 
-// Hook modificado para usar la librería importada en lugar de CDN
+// Hook modificado para usar la librer├¡a importada en lugar de CDN
 const useXLSX = () => {
-    // En este entorno de build, XLSX siempre está disponible via import
+    // En este entorno de build, XLSX siempre est├í disponible via import
     return true;
 };
 
@@ -79,7 +78,7 @@ const AikenCalculator = ({ xlsxReady }) => {
 
     // Inicializar matriz de datos
     useEffect(() => {
-        // Solo resetear si cambian las dimensiones drásticamente o está vacío
+        // Solo resetear si cambian las dimensiones dr├ísticamente o est├í vac├¡o
         if (data.length !== config.items || (data[0] && data[0].length !== config.judges)) {
             const newData = Array(config.items).fill(0).map(() => Array(config.judges).fill(0));
             setData(newData);
@@ -95,11 +94,11 @@ const AikenCalculator = ({ xlsxReady }) => {
 
     const addScaleOption = () => {
         const lastVal = scale.length > 0 ? scale[scale.length - 1].value : -1;
-        setScale([...scale, { name: 'Nueva Opción', value: lastVal + 1 }]);
+        setScale([...scale, { name: 'Nueva Opci├│n', value: lastVal + 1 }]);
     };
 
     const removeScaleOption = (idx) => {
-        if (scale.length <= 2) return; // Mínimo 2
+        if (scale.length <= 2) return; // M├¡nimo 2
         setScale(scale.filter((_, i) => i !== idx));
     };
 
@@ -122,9 +121,9 @@ const AikenCalculator = ({ xlsxReady }) => {
             const ws = wb.Sheets[wsname];
             const rawData = XLSX.utils.sheet_to_json(ws, { header: 1 });
 
-            // Intentar ajustar a la configuración
+            // Intentar ajustar a la configuraci├│n
             if (rawData.length > 0) {
-                // Asumimos que el excel trae solo los números
+                // Asumimos que el excel trae solo los n├║meros
                 const rows = rawData.length;
                 const cols = rawData[0].length;
 
@@ -149,16 +148,16 @@ const AikenCalculator = ({ xlsxReady }) => {
         const newResults = data.map((row, idx) => {
             const sum = row.reduce((a, b) => a + b, 0);
             const mean = sum / config.judges;
-            // Fórmula V de Aiken: V = (Media - Lo) / (Hi - Lo)
-            // Ojo: La fórmula común es S / (n * (c-1)). Donde S = Sum(x - Lo). 
+            // F├│rmula V de Aiken: V = (Media - Lo) / (Hi - Lo)
+            // Ojo: La f├│rmula com├║n es S / (n * (c-1)). Donde S = Sum(x - Lo). 
             // Es equivalente a (Mean - Min) / (Max - Min).
             const v = (mean - minVal) / range;
 
             // Veredicto simple basado en umbral conservador
-            // Para rigor académico real se usarían tablas de probabilidad binomial.
+            // Para rigor acad├®mico real se usar├¡an tablas de probabilidad binomial.
             // Usaremos 0.70 como corte base, ajustado por confianza.
             const threshold = config.confidence === 0.99 ? 0.80 : 0.70;
-            const verdict = v >= threshold ? "Válido" : "Revisar";
+            const verdict = v >= threshold ? "V├ílido" : "Revisar";
 
             return { item: idx + 1, mean, v: v.toFixed(3), verdict };
         });
@@ -170,7 +169,7 @@ const AikenCalculator = ({ xlsxReady }) => {
         const doc = new jsPDF();
         doc.text("Resultados V de Aiken", 14, 16);
         autoTable(doc, {
-            head: [['Ítem', 'Coef. V', 'Veredicto']],
+            head: [['├ìtem', 'Coef. V', 'Veredicto']],
             body: results.map(r => [r.item, r.v, r.verdict]),
             startY: 20
         });
@@ -217,7 +216,7 @@ const AikenCalculator = ({ xlsxReady }) => {
                 <thead>
                     <tr><th colspan="3" class="title">Resultados V de Aiken</th></tr>
                     <tr>
-                        <th>Ítem</th>
+                        <th>├ìtem</th>
                         <th>Coef. V</th>
                         <th>Veredicto</th>
                     </tr>
@@ -262,11 +261,11 @@ const AikenCalculator = ({ xlsxReady }) => {
 
     return (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-            {/* Panel Izquierdo: Configuración */}
+            {/* Panel Izquierdo: Configuraci├│n */}
             <div className="lg:col-span-3 space-y-6">
                 <Card className="p-5">
                     <h3 className="font-bold text-slate-800 mb-4 flex items-center">
-                        <Settings className="w-5 h-5 mr-2 text-blue-600" /> Configuración
+                        <Settings className="w-5 h-5 mr-2 text-blue-600" /> Configuraci├│n
                     </h3>
 
                     <div className="space-y-4">
@@ -280,7 +279,7 @@ const AikenCalculator = ({ xlsxReady }) => {
                             />
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-slate-600 mb-1">Ítems</label>
+                            <label className="block text-sm font-medium text-slate-600 mb-1">├ìtems</label>
                             <input
                                 type="number"
                                 value={config.items}
@@ -303,7 +302,7 @@ const AikenCalculator = ({ xlsxReady }) => {
                 </Card>
 
                 <Card className="p-5">
-                    <h3 className="font-bold text-slate-800 mb-4">Escala de Valoración</h3>
+                    <h3 className="font-bold text-slate-800 mb-4">Escala de Valoraci├│n</h3>
                     <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
                         {scale.map((opt, idx) => (
                             <div key={idx} className="flex gap-2 items-center">
@@ -330,7 +329,7 @@ const AikenCalculator = ({ xlsxReady }) => {
                         ))}
                     </div>
                     <Button variant="outline" onClick={addScaleOption} className="w-full mt-4 text-sm py-1">
-                        <Plus size={14} className="mr-1" /> Añadir Opción
+                        <Plus size={14} className="mr-1" /> A├▒adir Opci├│n
                     </Button>
                 </Card>
             </div>
@@ -366,7 +365,7 @@ const AikenCalculator = ({ xlsxReady }) => {
                             <table className="w-full text-sm text-left">
                                 <thead className="bg-slate-50 text-slate-700 sticky top-0 z-10">
                                     <tr>
-                                        <th className="p-3 border-b font-semibold w-16">Ítem</th>
+                                        <th className="p-3 border-b font-semibold w-16">├ìtem</th>
                                         {Array.from({ length: config.judges }).map((_, i) => (
                                             <th key={i} className="p-3 border-b font-semibold text-center min-w-[60px]">J{i + 1}</th>
                                         ))}
@@ -403,7 +402,7 @@ const AikenCalculator = ({ xlsxReady }) => {
                                 <table className="w-full text-sm">
                                     <thead className="bg-slate-50 text-slate-600 sticky top-0">
                                         <tr>
-                                            <th className="p-2 border-b text-left">Ítem</th>
+                                            <th className="p-2 border-b text-left">├ìtem</th>
                                             <th className="p-2 border-b text-center">Coef. V</th>
                                             <th className="p-2 border-b text-right">Veredicto</th>
                                         </tr>
@@ -414,7 +413,7 @@ const AikenCalculator = ({ xlsxReady }) => {
                                                 <td className="p-2 font-medium text-slate-600">#{res.item}</td>
                                                 <td className="p-2 text-center font-bold text-blue-600">{res.v}</td>
                                                 <td className="p-2 text-right">
-                                                    <span className={`px-2 py-0.5 rounded-full text-xs ${res.verdict === 'Válido' ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'}`}>
+                                                    <span className={`px-2 py-0.5 rounded-full text-xs ${res.verdict === 'V├ílido' ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'}`}>
                                                         {res.verdict}
                                                     </span>
                                                 </td>
@@ -433,7 +432,7 @@ const AikenCalculator = ({ xlsxReady }) => {
                                 >
                                     Descargar PDF
                                 </Button>
-                                {copySuccess && <span className="text-xs text-emerald-500 animate-pulse">¡Copiado!</span>}
+                                {copySuccess && <span className="text-xs text-emerald-500 animate-pulse">┬íCopiado!</span>}
                                 <Button
                                     variant="secondary"
                                     icon={FileText}
@@ -459,13 +458,8 @@ const RangeCalculator = () => {
     const [variables, setVariables] = useState([
         {
             id: 1,
-            name: "Variable 1",
-            dimensions: [{ id: 1, name: 'Dimensión 1', items: 10 }]
-        },
-        {
-            id: 2,
-            name: "Variable 2",
-            dimensions: [{ id: 1, name: 'Dimensión 1', items: 10 }]
+            name: "Estr├®s Laboral",
+            dimensions: [{ id: 1, name: 'Dimensi├│n 1', items: 10 }]
         }
     ]);
     const [levelConfig, setLevelConfig] = useState({ count: 3, template: 'levels' }); // levels: Bajo/Medio/Alto
@@ -489,7 +483,7 @@ const RangeCalculator = () => {
         const newVariable = {
             id: Date.now(),
             name: `Variable ${variables.length + 1}`,
-            dimensions: [{ id: Date.now(), name: 'Dimensión 1', items: 10 }]
+            dimensions: [{ id: Date.now(), name: 'Dimensi├│n 1', items: 10 }]
         };
         setVariables([...variables, newVariable]);
     };
@@ -501,7 +495,7 @@ const RangeCalculator = () => {
     const addDimension = (varId) => {
         setVariables(variables.map(v => {
             if (v.id === varId) {
-                const newDimension = { id: Date.now(), name: `Dimensión ${v.dimensions.length + 1}`, items: 5 };
+                const newDimension = { id: Date.now(), name: `Dimensi├│n ${v.dimensions.length + 1}`, items: 5 };
                 return { ...v, dimensions: [...v.dimensions, newDimension] };
             }
             return v;
@@ -541,19 +535,19 @@ const RangeCalculator = () => {
                 const minRaw = dim.items * itemScale.min;
                 const maxRaw = dim.items * itemScale.max;
                 const range = maxRaw - minRaw;
-                const interval = range / levelConfig.count; // Intervalo matemático
+                const interval = range / levelConfig.count; // Intervalo matem├ítico
 
                 const levels = [];
                 let currentLower = minRaw;
 
                 for (let i = 0; i < levelConfig.count; i++) {
-                    // Lógica discreta simple
+                    // L├│gica discreta simple
                     let upper = Math.floor(minRaw + interval * (i + 1));
-                    // Ajuste fino para el último nivel para asegurar que toque el máximo
+                    // Ajuste fino para el ├║ltimo nivel para asegurar que toque el m├íximo
                     if (i === levelConfig.count - 1) upper = maxRaw;
 
-                    // Ajuste para el siguiente nivel (si no es el primero, empieza donde terminó el anterior + 1 si son enteros)
-                    // Aquí usamos una lógica inclusiva simple:
+                    // Ajuste para el siguiente nivel (si no es el primero, empieza donde termin├│ el anterior + 1 si son enteros)
+                    // Aqu├¡ usamos una l├│gica inclusiva simple:
                     // Nivel 1: Min -> Corte 1
                     // Nivel 2: Corte 1 + 1 -> Corte 2
                     const displayLower = i === 0 ? minRaw : Math.floor(minRaw + interval * i) + 1;
@@ -659,14 +653,14 @@ const RangeCalculator = () => {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
             <div className="lg:col-span-5 space-y-6">
                 <Card className="p-5 space-y-4">
-                    <h3 className="font-bold text-slate-800 border-b pb-2">1. Escala del Ítem</h3>
+                    <h3 className="font-bold text-slate-800 border-b pb-2">1. Escala del ├ìtem</h3>
                     <div className="flex gap-4">
                         <div className="flex-1">
-                            <label className="text-xs uppercase font-bold text-slate-500">Puntaje Mín</label>
+                            <label className="text-xs uppercase font-bold text-slate-500">Puntaje M├¡n</label>
                             <input type="number" value={itemScale.min} onChange={e => setItemScale({ ...itemScale, min: parseInt(e.target.value) })} className="w-full p-2 border rounded mt-1" />
                         </div>
                         <div className="flex-1">
-                            <label className="text-xs uppercase font-bold text-slate-500">Puntaje Máx</label>
+                            <label className="text-xs uppercase font-bold text-slate-500">Puntaje M├íx</label>
                             <input type="number" value={itemScale.max} onChange={e => setItemScale({ ...itemScale, max: parseInt(e.target.value) })} className="w-full p-2 border rounded mt-1" />
                         </div>
                     </div>
@@ -695,11 +689,11 @@ const RangeCalculator = () => {
                                         </div>
                                     ))}
                                 </div>
-                                <Button variant="outline" onClick={() => addDimension(v.id)} className="w-full py-1 text-sm mt-2"><Plus size={14} className="mr-1" /> Añadir Dimensión</Button>
+                                <Button variant="outline" onClick={() => addDimension(v.id)} className="w-full py-1 text-sm mt-2"><Plus size={14} className="mr-1" /> A├▒adir Dimensi├│n</Button>
                             </div>
                         ))}
                     </div>
-                    <Button variant="secondary" onClick={addVariable} className="w-full py-2 text-sm"><Plus size={14} className="mr-1" /> Añadir Variable</Button>
+                    <Button variant="secondary" onClick={addVariable} className="w-full py-2 text-sm"><Plus size={14} className="mr-1" /> A├▒adir Variable</Button>
                 </Card>
 
                 <Card className="p-5 space-y-4">
@@ -708,10 +702,10 @@ const RangeCalculator = () => {
                         <div className="md:col-span-1">
                             <label className="block text-sm font-medium text-slate-600 mb-1">Cant. Niveles</label>
                             <select value={levelConfig.count} onChange={e => setLevelConfig({ ...levelConfig, count: parseInt(e.target.value) })} className="w-full p-2 border rounded bg-white">
-                                <option value={2}>2 (Dicotómico)</option>
-                                <option value={3}>3 (Tricotómico)</option>
+                                <option value={2}>2 (Dicot├│mico)</option>
+                                <option value={3}>3 (Tricot├│mico)</option>
                                 <option value={4}>4 (Cuartiles)</option>
-                                <option value={5}>5 (Pentatómico)</option>
+                                <option value={5}>5 (Pentat├│mico)</option>
                             </select>
                         </div>
                         <div className="md:col-span-2">
@@ -743,10 +737,10 @@ const RangeCalculator = () => {
                         <div className="bg-slate-800 text-white p-4 flex justify-between items-center">
                             <div>
                                 <h3 className="font-bold text-lg">Tabla de Baremos</h3>
-                                <p className="text-slate-400 text-sm">{variables.map(v => v.name).join(' & ')} • Escala {itemScale.min}-{itemScale.max}</p>
+                                <p className="text-slate-400 text-sm">{variables.map(v => v.name).join(' & ')} ÔÇó Escala {itemScale.min}-{itemScale.max}</p>
                             </div>
                             <div className="flex gap-2 items-center">
-                                {copySuccess && <span className="text-xs text-emerald-500 animate-pulse">¡Copiado!</span>}
+                                {copySuccess && <span className="text-xs text-emerald-500 animate-pulse">┬íCopiado!</span>}
                                 <Button variant="secondary" icon={FileText} onClick={copyAsAPA7} className="text-sm">
                                     APA7
                                 </Button>
@@ -781,7 +775,7 @@ const RangeCalculator = () => {
                 ) : (
                     <div className="h-full flex flex-col items-center justify-center text-slate-400 border-2 border-dashed border-slate-300 rounded-xl p-10">
                         <Table size={48} className="mb-4 opacity-20" />
-                        <p>Configura los parámetros y genera la tabla.</p>
+                        <p>Configura los par├ímetros y genera la tabla.</p>
                     </div>
                 )}
             </div>
@@ -789,10 +783,10 @@ const RangeCalculator = () => {
     );
 };
 
-// --- HERRAMIENTA 3: CONFIGURACIÓN ENCUESTA ---
+// --- HERRAMIENTA 3: CONFIGURACI├ôN ENCUESTA ---
 
 const SurveyConfig = ({ xlsxReady }) => {
-    // Configuración inicial: Array de variables
+    // Configuraci├│n inicial: Array de variables
     const [variables, setVariables] = useState([
         {
             id: 1,
@@ -810,7 +804,7 @@ const SurveyConfig = ({ xlsxReady }) => {
     const [surveyData, setSurveyData] = useState([]);
     const [summaryMode, setSummaryMode] = useState('sum'); // avg | sum
 
-    // Calcular rangos de preguntas para visualización
+    // Calcular rangos de preguntas para visualizaci├│n
     const questionRanges = useMemo(() => {
         let current = 1;
         const map = {};
@@ -819,14 +813,14 @@ const SurveyConfig = ({ xlsxReady }) => {
                 const count = parseInt(d.items) || 0;
                 const start = current;
                 const end = current + count - 1;
-                map[`${v.id}-${d.id}`] = count > 0 ? (start === end ? `P${start}` : `P${start} - P${end}`) : 'Sin ítems';
+                map[`${v.id}-${d.id}`] = count > 0 ? (start === end ? `P${start}` : `P${start} - P${end}`) : 'Sin ├¡tems';
                 current += count;
             });
         });
         return map;
     }, [variables]);
 
-    // --- GESTIÓN DE CONFIGURACIÓN ---
+    // --- GESTI├ôN DE CONFIGURACI├ôN ---
 
     const addVariable = () => {
         const newVar = {
@@ -882,7 +876,7 @@ const SurveyConfig = ({ xlsxReady }) => {
         }));
     };
 
-    // --- GENERACIÓN DE ESTRUCTURA ---
+    // --- GENERACI├ôN DE ESTRUCTURA ---
 
     const generateStructure = () => {
         // Aplanar la estructura para facilitar el mapeo de columnas
@@ -915,7 +909,7 @@ const SurveyConfig = ({ xlsxReady }) => {
         setSurveyData([]); // Resetear datos al cambiar estructura
     };
 
-    // --- IMPORTACIÓN DE DATOS ---
+    // --- IMPORTACI├ôN DE DATOS ---
 
     const handleFileUpload = (e) => {
         const file = e.target.files[0];
@@ -928,13 +922,13 @@ const SurveyConfig = ({ xlsxReady }) => {
             const json = XLSX.utils.sheet_to_json(ws, { header: 1 });
 
             if (json.length > 1) {
-                // Validación de columnas
+                // Validaci├│n de columnas
                 const detectedCols = json[0].length;
                 if (detectedCols !== structure.totalColumns) {
                     const proceed = window.confirm(
-                        `⚠️ Advertencia de Estructura\n\n` +
-                        `El archivo Excel tiene ${detectedCols} columnas, pero la configuración espera ${structure.totalColumns} ítems.\n\n` +
-                        `¿Desea continuar de todos modos? (Se tomarán las primeras ${structure.totalColumns} columnas)`
+                        `ÔÜá´©Å Advertencia de Estructura\n\n` +
+                        `El archivo Excel tiene ${detectedCols} columnas, pero la configuraci├│n espera ${structure.totalColumns} ├¡tems.\n\n` +
+                        `┬┐Desea continuar de todos modos? (Se tomar├ín las primeras ${structure.totalColumns} columnas)`
                     );
                     if (!proceed) return;
                 }
@@ -942,7 +936,7 @@ const SurveyConfig = ({ xlsxReady }) => {
                 // Asumimos fila 1 headers.
                 // Validar si tenemos suficientes columnas? Por ahora leemos lo que haya hasta totalColumns
                 const dataRows = json.slice(1).map((row, i) => {
-                    // Asegurar que tenemos valores numéricos
+                    // Asegurar que tenemos valores num├®ricos
                     const cleanValues = row.slice(0, structure.totalColumns).map(v => parseFloat(v) || 0);
                     // Rellenar con 0 si faltan columnas en el excel
                     while (cleanValues.length < structure.totalColumns) cleanValues.push(0);
@@ -958,7 +952,7 @@ const SurveyConfig = ({ xlsxReady }) => {
         reader.readAsBinaryString(file);
     };
 
-    // --- CÁLCULOS Y RESUMEN ---
+    // --- C├üLCULOS Y RESUMEN ---
 
     const summaryData = useMemo(() => {
         if (!structure || surveyData.length === 0) return [];
@@ -978,8 +972,8 @@ const SurveyConfig = ({ xlsxReady }) => {
 
                 // Total Variable
                 // Suma de los valores de todas las dimensiones de esta variable
-                // Ojo: si es promedio, ¿es promedio de promedios o promedio de items?
-                // Generalmente en psicometría se trabaja con sumas o promedios de items.
+                // Ojo: si es promedio, ┬┐es promedio de promedios o promedio de items?
+                // Generalmente en psicometr├¡a se trabaja con sumas o promedios de items.
                 // Haremos promedio de todos los items de la variable.
 
                 // Recolectar todos los valores de la variable
@@ -1002,7 +996,7 @@ const SurveyConfig = ({ xlsxReady }) => {
         });
     }, [surveyData, structure, summaryMode]);
 
-    // --- EXPORTACIÓN ---
+    // --- EXPORTACI├ôN ---
 
     const exportSummaryToExcel = () => {
         if (!summaryData.length) return;
@@ -1011,7 +1005,7 @@ const SurveyConfig = ({ xlsxReady }) => {
         // Nivel 1: Variable | ... | Variable | ...
         // Nivel 2: Dim1 | Dim2 | Total | Dim1 ...
 
-        // Haremos una estructura plana para la hoja de cálculo:
+        // Haremos una estructura plana para la hoja de c├ílculo:
         // Sujeto | Var1_Dim1 | Var1_Dim2 | Var1_Total | Var2_Dim1 ...
 
         const headers = ["Sujeto"];
@@ -1039,12 +1033,12 @@ const SurveyConfig = ({ xlsxReady }) => {
 
     return (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-            {/* Panel Izquierdo: Configuración */}
+            {/* Panel Izquierdo: Configuraci├│n */}
             <div className="lg:col-span-4 space-y-6">
                 <Card className="p-5 max-h-[calc(100vh-200px)] overflow-y-auto">
                     <div className="flex justify-between items-center mb-4 border-b pb-2">
                         <h3 className="font-bold text-slate-800 flex items-center">
-                            <Settings className="w-5 h-5 mr-2 text-blue-600" /> Configuración
+                            <Settings className="w-5 h-5 mr-2 text-blue-600" /> Configuraci├│n
                         </h3>
                         <Button variant="secondary" onClick={addVariable} className="text-xs py-1 px-2">
                             <Plus size={14} className="mr-1" /> Variable
@@ -1075,7 +1069,7 @@ const SurveyConfig = ({ xlsxReady }) => {
                                                     value={d.name}
                                                     onChange={(e) => updateDimension(v.id, d.id, 'name', e.target.value)}
                                                     className="flex-1 p-1 text-xs border rounded"
-                                                    placeholder="Dimensión"
+                                                    placeholder="Dimensi├│n"
                                                 />
                                                 <input
                                                     type="number"
@@ -1100,7 +1094,7 @@ const SurveyConfig = ({ xlsxReady }) => {
                                         onClick={() => addDimension(v.id)}
                                         className="text-xs text-blue-600 hover:text-blue-800 flex items-center mt-2"
                                     >
-                                        <Plus size={12} className="mr-1" /> Dimensión
+                                        <Plus size={12} className="mr-1" /> Dimensi├│n
                                     </button>
                                 </div>
                             </div>
@@ -1197,7 +1191,7 @@ const SurveyConfig = ({ xlsxReady }) => {
                                     <div className="h-full flex flex-col items-center justify-center text-slate-400">
                                         <FileSpreadsheet size={48} className="mb-4 opacity-20" />
                                         <p>Carga un archivo Excel para ver los resultados</p>
-                                        <p className="text-xs mt-2">El archivo debe tener al menos {structure.totalColumns} columnas de datos numéricos.</p>
+                                        <p className="text-xs mt-2">El archivo debe tener al menos {structure.totalColumns} columnas de datos num├®ricos.</p>
                                     </div>
                                 )}
                             </div>
@@ -1217,7 +1211,7 @@ const SurveyConfig = ({ xlsxReady }) => {
     );
 };
 
-// --- HERRAMIENTA 4: RECODIFICACIÓN ---
+// --- HERRAMIENTA 4: RECODIFICACI├ôN ---
 
 const LikertRecoder = ({ xlsxReady }) => {
     const [config, setConfig] = useState({ min: 1, max: 5 });
@@ -1260,7 +1254,7 @@ const LikertRecoder = ({ xlsxReady }) => {
                 if (selectedCols.has(idx)) {
                     const val = parseFloat(cell);
                     if (!isNaN(val)) {
-                        // Fórmula: (Max + Min) - Val
+                        // F├│rmula: (Max + Min) - Val
                         return (config.max + config.min) - val;
                     }
                 }
@@ -1280,11 +1274,11 @@ const LikertRecoder = ({ xlsxReady }) => {
         <div className="space-y-6">
             <Card className="p-5 flex gap-6 items-end">
                 <div>
-                    <label className="block text-xs font-bold text-slate-500 mb-1">Escala Mín</label>
+                    <label className="block text-xs font-bold text-slate-500 mb-1">Escala M├¡n</label>
                     <input type="number" value={config.min} onChange={e => setConfig({ ...config, min: parseInt(e.target.value) })} className="p-2 border rounded w-24" />
                 </div>
                 <div>
-                    <label className="block text-xs font-bold text-slate-500 mb-1">Escala Máx</label>
+                    <label className="block text-xs font-bold text-slate-500 mb-1">Escala M├íx</label>
                     <input type="number" value={config.max} onChange={e => setConfig({ ...config, max: parseInt(e.target.value) })} className="p-2 border rounded w-24" />
                 </div>
                 <div className="relative">
@@ -1355,14 +1349,34 @@ const LikertRecoder = ({ xlsxReady }) => {
 // --- HERRAMIENTA 5: ALFA DE CRONBACH ---
 
 const CronbachAlpha = ({ xlsxReady }) => {
-    const [mode, setMode] = useState('global'); // 'global' | 'multi'
-    const [variables, setVariables] = useState([]);
-    const [totalCols, setTotalCols] = useState(0);
+    const [variables, setVariables] = useState([
+        { id: 1, name: "Variable 1", items: 10 },
+        { id: 2, name: "Variable 2", items: 10 }
+    ]);
     const [surveyData, setSurveyData] = useState([]);
     const [results, setResults] = useState(null);
     const [copySuccess, setCopySuccess] = useState(false);
 
-    // Al cargar archivo, detectamos columnas
+    const addVariable = () => {
+        const newVar = {
+            id: Date.now(),
+            name: `Variable ${variables.length + 1}`,
+            items: 10
+        };
+        setVariables([...variables, newVar]);
+    };
+
+    const removeVariable = (id) => {
+        if (variables.length <= 1) return;
+        setVariables(variables.filter(v => v.id !== id));
+    };
+
+    const updateVariable = (id, field, val) => {
+        setVariables(variables.map(v => v.id === id ? { ...v, [field]: field === 'items' ? parseInt(val) || 0 : val } : v));
+    };
+
+    const totalItems = variables.reduce((acc, v) => acc + v.items, 0);
+
     const handleFileUpload = (e) => {
         const file = e.target.files[0];
         if (!file) return;
@@ -1374,60 +1388,24 @@ const CronbachAlpha = ({ xlsxReady }) => {
             const json = XLSX.utils.sheet_to_json(ws, { header: 1 });
 
             if (json.length > 1) {
+                // Validar columnas
                 const detectedCols = json[0].length;
-                setTotalCols(detectedCols);
+                if (detectedCols < totalItems) {
+                    alert(`El archivo tiene ${detectedCols} columnas, pero se requieren ${totalItems} seg├║n la configuraci├│n.`);
+                    return;
+                }
 
-                // Procesar datos (asumimos fila 1 headers)
+                // Asumimos fila 1 headers, resto datos
                 const dataRows = json.slice(1).map(row => {
-                    // Asegurar que todas las filas tengan el mismo largo rellenando con 0 si falta
-                    const fullRow = Array(detectedCols).fill(0);
-                    row.forEach((val, idx) => {
-                        if (idx < detectedCols) fullRow[idx] = parseFloat(val) || 0;
-                    });
-                    return fullRow;
+                    // Convertir a n├║meros y asegurar longitud
+                    const nums = row.slice(0, totalItems).map(v => parseFloat(v) || 0);
+                    return nums;
                 });
                 setSurveyData(dataRows);
                 setResults(null);
-                setVariables([]); // Reset variables on new file
-            } else {
-                alert("El archivo parece vacío.");
             }
         };
         reader.readAsBinaryString(file);
-    };
-
-    const addVariable = () => {
-        const nextId = variables.length + 1;
-        // Sugerir rango basado en el anterior
-        let start = 1;
-        if (variables.length > 0) {
-            start = variables[variables.length - 1].end + 1;
-        }
-        if (start > totalCols) start = totalCols;
-
-        setVariables([...variables, {
-            id: Date.now(),
-            name: `Variable ${nextId}`,
-            start: start,
-            end: start // Default to single col
-        }]);
-    };
-
-    const updateVariable = (id, field, val) => {
-        setVariables(variables.map(v => {
-            if (v.id === id) {
-                let newVal = val;
-                if (field === 'start' || field === 'end') {
-                    newVal = parseInt(val) || 0;
-                }
-                return { ...v, [field]: newVal };
-            }
-            return v;
-        }));
-    };
-
-    const removeVariable = (id) => {
-        setVariables(variables.filter(v => v.id !== id));
     };
 
     const getInterpretation = (alpha) => {
@@ -1438,93 +1416,55 @@ const CronbachAlpha = ({ xlsxReady }) => {
         return { text: "Muy baja*", color: "text-red-700 bg-red-100" };
     };
 
-    const calculateAlphaForSubset = (data, startCol, endCol) => {
-        // Indices 0-based, inputs 1-based
-        const start = Math.max(0, startCol - 1);
-        const end = Math.min(data[0].length, endCol); // slice is exclusive of end, so endCol is correct index
-
-        const nItems = end - start;
-        if (nItems < 2) return null; // Need at least 2 items
-
-        const nSubjects = data.length;
-
-        // 1. Varianza ítems
-        let sumItemVariances = 0;
-        for (let i = start; i < end; i++) {
-            const itemScores = data.map(r => r[i]);
-            const mean = itemScores.reduce((a, b) => a + b, 0) / nSubjects;
-            const variance = itemScores.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / (nSubjects - 1);
-            sumItemVariances += variance;
-        }
-
-        // 2. Varianza total
-        const totalScores = data.map(row => {
-            let sum = 0;
-            for (let i = start; i < end; i++) sum += row[i];
-            return sum;
-        });
-        const totalMean = totalScores.reduce((a, b) => a + b, 0) / nSubjects;
-        const totalVariance = totalScores.reduce((a, b) => a + Math.pow(b - totalMean, 2), 0) / (nSubjects - 1);
-
-        // 3. Alfa
-        let alpha = 0;
-        if (totalVariance > 0) {
-            alpha = (nItems / (nItems - 1)) * (1 - (sumItemVariances / totalVariance));
-        }
-
-        return {
-            items: nItems,
-            alpha: alpha,
-            interpretation: getInterpretation(alpha)
-        };
-    };
-
     const calculate = () => {
         if (surveyData.length === 0) return;
 
-        let newResults = [];
+        let currentIndex = 0;
+        const newResults = variables.map(v => {
+            const start = currentIndex;
+            const end = currentIndex + v.items;
+            currentIndex += v.items;
 
-        if (mode === 'global') {
-            const res = calculateAlphaForSubset(surveyData, 1, totalCols);
-            if (res) {
-                newResults.push({ name: "Escala General", ...res });
-            } else {
-                alert("No se pudo calcular. Asegúrate de tener al menos 2 columnas.");
-            }
-        } else {
-            // Multi variable
-            if (variables.length === 0) {
-                alert("Define al menos una variable.");
-                return;
+            // Extraer datos para esta variable
+            // Matriz: filas = sujetos, columnas = items de esta variable
+            const varData = surveyData.map(row => row.slice(start, end));
+            const nItems = v.items;
+            const nSubjects = varData.length;
+
+            if (nItems < 2) return { ...v, alpha: 0, interpretation: getInterpretation(0) };
+
+            // 1. Varianza de cada ├¡tem
+            let sumItemVariances = 0;
+            for (let i = 0; i < nItems; i++) {
+                const itemScores = varData.map(r => r[i]);
+                const mean = itemScores.reduce((a, b) => a + b, 0) / nSubjects;
+                const variance = itemScores.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / (nSubjects - 1);
+                sumItemVariances += variance;
             }
 
-            variables.forEach(v => {
-                const res = calculateAlphaForSubset(surveyData, v.start, v.end);
-                if (res) {
-                    newResults.push({ name: v.name, ...res });
-                } else {
-                    newResults.push({ name: v.name, error: "Rango inválido (<2 ítems)" });
-                }
-            });
-        }
+            // 2. Varianza del total
+            const totalScores = varData.map(row => row.reduce((a, b) => a + b, 0));
+            const totalMean = totalScores.reduce((a, b) => a + b, 0) / nSubjects;
+            const totalVariance = totalScores.reduce((a, b) => a + Math.pow(b - totalMean, 2), 0) / (nSubjects - 1);
+
+            // 3. Alfa
+            let alpha = 0;
+            if (totalVariance > 0) {
+                alpha = (nItems / (nItems - 1)) * (1 - (sumItemVariances / totalVariance));
+            }
+
+            return {
+                ...v,
+                alpha: alpha,
+                interpretation: getInterpretation(alpha)
+            };
+        });
 
         setResults(newResults);
     };
 
     const copyAPA7 = () => {
         if (!results) return;
-
-        let rowsHTML = results.map(r => {
-            if (r.error) return '';
-            return `
-                <tr>
-                    <td>${r.name}</td>
-                    <td style="text-align:center">${r.items}</td>
-                    <td style="text-align:center">${r.alpha.toFixed(3).replace('.', ',')}</td>
-                    <td>${r.interpretation.text}</td>
-                </tr>
-            `;
-        }).join('');
 
         let tableHTML = `
             <style>
@@ -1540,16 +1480,23 @@ const CronbachAlpha = ({ xlsxReady }) => {
                 <thead>
                     <tr>
                         <th>Variable</th>
-                        <th style="text-align:center">Nº Elementos</th>
-                        <th style="text-align:center">α</th>
-                        <th>Interpretación</th>
+                        <th>N┬░ ├ìtems</th>
+                        <th>╬▒</th>
+                        <th>Interpretaci├│n</th>
                     </tr>
                 </thead>
                 <tbody>
-                    ${rowsHTML}
+                    ${results.map(r => `
+                        <tr>
+                            <td>${r.name}</td>
+                            <td>${r.items}</td>
+                            <td>${r.alpha.toFixed(3)}</td>
+                            <td>${r.interpretation.text}</td>
+                        </tr>
+                    `).join('')}
                 </tbody>
             </table>
-            <div class="note">Nota. Interpretación basada en Palella y Martins (2012).</div>
+            <div class="note">Nota. Interpretaci├│n basada en Palella y Martins (2012).</div>
         `;
 
         const type = "text/html";
@@ -1567,189 +1514,127 @@ const CronbachAlpha = ({ xlsxReady }) => {
 
     return (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-            {/* Configuración */}
-            <div className="lg:col-span-5 space-y-6">
+            {/* Configuraci├│n */}
+            <div className="lg:col-span-4 space-y-6">
                 <Card className="p-5">
                     <h3 className="font-bold text-slate-800 mb-4 flex items-center">
-                        <Settings className="w-5 h-5 mr-2 text-blue-600" /> Configuración de Análisis
+                        <Settings className="w-5 h-5 mr-2 text-blue-600" /> Configuraci├│n
                     </h3>
-
-                    {/* 1. Carga */}
-                    <div className="mb-6">
-                        <label className="block text-sm font-bold text-slate-700 mb-2">1. Cargar Datos</label>
-                        <div className="relative">
-                            <input type="file" accept=".xlsx" onChange={handleFileUpload} className="absolute inset-0 w-full opacity-0 cursor-pointer" disabled={!xlsxReady} />
-                            <div className={`border-2 border-dashed rounded-lg p-4 text-center transition-colors cursor-pointer ${surveyData.length > 0 ? 'border-green-300 bg-green-50' : 'border-slate-300 hover:bg-slate-50'}`}>
-                                {surveyData.length > 0 ? (
-                                    <div className="text-green-700">
-                                        <CheckCircle className="mx-auto mb-1" size={24} />
-                                        <span className="font-bold text-sm">Datos Cargados</span>
-                                        <p className="text-xs mt-1">{surveyData.length} filas, {totalCols} columnas detectadas</p>
-                                    </div>
-                                ) : (
-                                    <div className="text-slate-500">
-                                        <Upload className="mx-auto mb-1" size={24} />
-                                        <span className="text-sm">Seleccionar Excel (.xlsx)</span>
-                                    </div>
-                                )}
+                    <div className="space-y-4">
+                        {variables.map((v, idx) => (
+                            <div key={v.id} className="bg-slate-50 p-3 rounded border">
+                                <div className="flex justify-between mb-2">
+                                    <span className="font-bold text-sm text-slate-600">Variable {idx + 1}</span>
+                                    {variables.length > 1 && (
+                                        <button onClick={() => removeVariable(v.id)} className="text-red-400 hover:text-red-600"><Trash2 size={16} /></button>
+                                    )}
+                                </div>
+                                <input
+                                    type="text"
+                                    value={v.name}
+                                    onChange={(e) => updateVariable(v.id, 'name', e.target.value)}
+                                    className="w-full p-2 border rounded text-sm mb-2"
+                                    placeholder="Nombre de la variable"
+                                />
+                                <div className="flex items-center gap-2">
+                                    <label className="text-xs font-bold text-slate-500">├ìtems:</label>
+                                    <input
+                                        type="number"
+                                        value={v.items}
+                                        onChange={(e) => updateVariable(v.id, 'items', e.target.value)}
+                                        className="w-20 p-1 border rounded text-sm"
+                                    />
+                                </div>
                             </div>
-                        </div>
+                        ))}
+                        <Button variant="outline" onClick={addVariable} className="w-full text-sm"><Plus size={14} className="mr-1" /> A├▒adir Variable</Button>
                     </div>
-
-                    {/* 2. Modo */}
-                    {surveyData.length > 0 && (
-                        <div className="animate-in fade-in slide-in-from-top-2 space-y-6">
-                            <div>
-                                <label className="block text-sm font-bold text-slate-700 mb-2">2. Tipo de Análisis</label>
-                                <div className="flex gap-4">
-                                    <label className={`flex-1 p-3 border rounded-lg cursor-pointer transition-all ${mode === 'global' ? 'bg-blue-50 border-blue-500 ring-1 ring-blue-500' : 'hover:bg-slate-50'}`}>
-                                        <input type="radio" name="mode" value="global" checked={mode === 'global'} onChange={() => setMode('global')} className="sr-only" />
-                                        <div className="text-center">
-                                            <span className="block font-bold text-sm text-slate-800">Global</span>
-                                            <span className="text-xs text-slate-500">Todas las columnas (1-{totalCols})</span>
-                                        </div>
-                                    </label>
-                                    <label className={`flex-1 p-3 border rounded-lg cursor-pointer transition-all ${mode === 'multi' ? 'bg-blue-50 border-blue-500 ring-1 ring-blue-500' : 'hover:bg-slate-50'}`}>
-                                        <input type="radio" name="mode" value="multi" checked={mode === 'multi'} onChange={() => setMode('multi')} className="sr-only" />
-                                        <div className="text-center">
-                                            <span className="block font-bold text-sm text-slate-800">Por Variables</span>
-                                            <span className="text-xs text-slate-500">Definir rangos específicos</span>
-                                        </div>
-                                    </label>
-                                </div>
-                            </div>
-
-                            {/* 3. Definición de Variables (Solo Multi) */}
-                            {mode === 'multi' && (
-                                <div>
-                                    <div className="flex justify-between items-center mb-2">
-                                        <label className="block text-sm font-bold text-slate-700">3. Definir Variables</label>
-                                        <button onClick={addVariable} className="text-xs flex items-center text-blue-600 font-bold hover:underline">
-                                            <Plus size={14} className="mr-1" /> Agregar
-                                        </button>
-                                    </div>
-                                    <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1">
-                                        {variables.map((v, idx) => (
-                                            <div key={v.id} className="bg-slate-50 p-2 rounded border flex items-center gap-2 text-sm">
-                                                <span className="font-bold text-slate-400 w-4">{idx + 1}.</span>
-                                                <input
-                                                    type="text"
-                                                    value={v.name}
-                                                    onChange={(e) => updateVariable(v.id, 'name', e.target.value)}
-                                                    className="flex-1 p-1.5 border rounded outline-none focus:border-blue-500"
-                                                    placeholder="Nombre"
-                                                />
-                                                <div className="flex items-center gap-1">
-                                                    <span className="text-xs text-slate-500">Col:</span>
-                                                    <input
-                                                        type="number"
-                                                        value={v.start}
-                                                        onChange={(e) => updateVariable(v.id, 'start', e.target.value)}
-                                                        className="w-12 p-1.5 border rounded text-center outline-none focus:border-blue-500"
-                                                    />
-                                                    <span className="text-slate-400">-</span>
-                                                    <input
-                                                        type="number"
-                                                        value={v.end}
-                                                        onChange={(e) => updateVariable(v.id, 'end', e.target.value)}
-                                                        className="w-12 p-1.5 border rounded text-center outline-none focus:border-blue-500"
-                                                    />
-                                                </div>
-                                                <button onClick={() => removeVariable(v.id)} className="text-red-400 hover:text-red-600 p-1">
-                                                    <Trash2 size={16} />
-                                                </button>
-                                            </div>
-                                        ))}
-                                        {variables.length === 0 && (
-                                            <div className="text-center p-4 text-slate-400 text-xs italic border-2 border-dashed rounded">
-                                                Agrega variables para definir qué columnas analizar.
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-                            )}
-
-                            <Button variant="primary" onClick={calculate} className="w-full">
-                                <Activity size={18} className="mr-2" /> Calcular Alfa de Cronbach
-                            </Button>
-                        </div>
-                    )}
                 </Card>
             </div>
 
-            {/* Resultados */}
-            <div className="lg:col-span-7 space-y-6">
-                {results ? (
-                    <Card className="p-0 overflow-hidden animate-in fade-in zoom-in-95">
+            {/* Datos y Resultados */}
+            <div className="lg:col-span-8 space-y-6">
+                <Card className="p-5">
+                    <div className="flex justify-between items-center mb-4">
+                        <div>
+                            <h3 className="font-bold text-lg text-slate-800">Carga de Datos</h3>
+                            <p className="text-sm text-slate-500">Se esperan {totalItems} columnas en total.</p>
+                        </div>
+                        <div className="relative">
+                            <input type="file" accept=".xlsx" onChange={handleFileUpload} className="absolute inset-0 w-full opacity-0 cursor-pointer" disabled={!xlsxReady} />
+                            <Button variant="secondary" icon={Upload} disabled={!xlsxReady}>Cargar Excel</Button>
+                        </div>
+                    </div>
+
+                    {surveyData.length > 0 && (
+                        <div className="space-y-6">
+                            <div className="bg-slate-50 p-3 rounded border text-sm text-slate-600">
+                                <CheckCircle size={16} className="inline text-green-500 mr-2" />
+                                Se han cargado <strong>{surveyData.length}</strong> filas de datos.
+                            </div>
+
+                            <Button variant="primary" onClick={calculate} className="w-full">Calcular Alfa de Cronbach</Button>
+                        </div>
+                    )}
+                </Card>
+
+                {results && (
+                    <Card className="p-0 overflow-hidden">
                         <div className="bg-slate-800 text-white p-4 flex justify-between items-center">
-                            <h3 className="font-bold flex items-center">
-                                <Activity className="mr-2" size={18} /> Resultados
-                            </h3>
+                            <h3 className="font-bold">Resultados</h3>
                             <div className="flex gap-2 items-center">
-                                {copySuccess && <span className="text-xs text-emerald-500 animate-pulse font-bold">¡Copiado!</span>}
-                                <Button variant="secondary" icon={FileText} onClick={copyAPA7} className="text-xs">Copiar Tabla APA 7</Button>
+                                {copySuccess && <span className="text-xs text-emerald-500 animate-pulse">┬íCopiado!</span>}
+                                <Button variant="secondary" icon={FileText} onClick={copyAPA7} className="text-xs">Copiar APA 7</Button>
                             </div>
                         </div>
                         <div className="p-6">
-                            <table className="w-full text-sm text-left border rounded-lg overflow-hidden">
-                                <thead className="bg-slate-50 border-b">
+                            <table className="w-full text-sm text-left">
+                                <thead className="border-b-2 border-slate-200">
                                     <tr>
-                                        <th className="p-3 text-slate-600">Variable</th>
-                                        <th className="p-3 text-center text-slate-600">Nº Elementos</th>
-                                        <th className="p-3 text-center text-slate-600">Alfa (α)</th>
-                                        <th className="p-3 text-slate-600">Interpretación</th>
+                                        <th className="p-3">Variable</th>
+                                        <th className="p-3 text-center">├ìtems</th>
+                                        <th className="p-3 text-center">Alfa (╬▒)</th>
+                                        <th className="p-3">Interpretaci├│n</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y">
                                     {results.map((r, i) => (
                                         <tr key={i}>
                                             <td className="p-3 font-medium">{r.name}</td>
-                                            {r.error ? (
-                                                <td colSpan={3} className="p-3 text-red-500 text-xs italic">{r.error}</td>
-                                            ) : (
-                                                <>
-                                                    <td className="p-3 text-center text-slate-500">{r.items}</td>
-                                                    <td className="p-3 text-center font-bold text-slate-800">{r.alpha.toFixed(3).replace('.', ',')}</td>
-                                                    <td className="p-3">
-                                                        <span className={`px-2 py-1 rounded text-xs font-bold ${r.interpretation.color}`}>
-                                                            {r.interpretation.text}
-                                                        </span>
-                                                    </td>
-                                                </>
-                                            )}
+                                            <td className="p-3 text-center text-slate-500">{r.items}</td>
+                                            <td className="p-3 text-center font-bold text-blue-600">{r.alpha.toFixed(3)}</td>
+                                            <td className="p-3">
+                                                <span className={`px-2 py-1 rounded text-xs font-bold ${r.interpretation.color}`}>
+                                                    {r.interpretation.text}
+                                                </span>
+                                            </td>
                                         </tr>
                                     ))}
                                 </tbody>
                             </table>
 
-                            <div className="mt-6 bg-slate-50 p-4 rounded-lg border border-slate-200">
-                                <h4 className="font-bold text-slate-700 mb-3 text-xs uppercase tracking-wide">Escala de Interpretación (Palella y Martins, 2012)</h4>
-                                <div className="grid grid-cols-2 gap-y-2 gap-x-4 text-xs text-slate-600">
-                                    <div className="flex justify-between"><span>0,81 - 1.00:</span> <span className="font-bold text-green-700">Muy alta</span></div>
-                                    <div className="flex justify-between"><span>0,61 - 0.80:</span> <span className="font-bold text-emerald-700">Alta</span></div>
-                                    <div className="flex justify-between"><span>0,41 - 0.60:</span> <span className="font-bold text-yellow-700">Media*</span></div>
-                                    <div className="flex justify-between"><span>0,21 - 0.40:</span> <span className="font-bold text-orange-700">Baja*</span></div>
-                                    <div className="flex justify-between"><span>0.00 - 0.20:</span> <span className="font-bold text-red-700">Muy baja*</span></div>
+                            <div className="mt-6 bg-blue-50 p-4 rounded-lg border border-blue-100">
+                                <h4 className="font-bold text-blue-800 mb-2 text-sm">Criterios de Interpretaci├│n</h4>
+                                <div className="grid grid-cols-2 gap-2 text-xs text-slate-600">
+                                    <div>0,81 - 1.00: <span className="font-bold text-green-700">Muy alta</span></div>
+                                    <div>0,61 - 0.80: <span className="font-bold text-emerald-700">Alta</span></div>
+                                    <div>0,41 - 0.60: <span className="font-bold text-yellow-700">Media*</span></div>
+                                    <div>0,21 - 0.40: <span className="font-bold text-orange-700">Baja*</span></div>
+                                    <div>0.00 - 0.20: <span className="font-bold text-red-700">Muy baja*</span></div>
                                 </div>
-                                <p className="text-[10px] text-slate-400 mt-3 italic border-t pt-2">
-                                    * Se sugiere repetir la validación del instrumento puesto que es recomendable que el resultado sea mayor a 0,61.
+                                <p className="text-[10px] text-slate-500 mt-2 italic">
+                                    * Se sugiere repetir la validaci├│n del instrumento puesto que es recomendable que el resultado sea mayor a 0,61.
                                 </p>
                             </div>
                         </div>
                     </Card>
-                ) : (
-                    <div className="h-full flex flex-col items-center justify-center text-slate-400 border-2 border-dashed border-slate-300 rounded-xl p-10 bg-slate-50/30">
-                        <Activity size={48} className="mb-4 opacity-20" />
-                        <p className="font-medium text-lg text-slate-600">Resultados del Análisis</p>
-                        <p className="max-w-sm text-center mt-2 text-sm">
-                            Configura el análisis en el panel izquierdo y haz clic en "Calcular" para ver los resultados.
-                        </p>
-                    </div>
                 )}
             </div>
         </div>
     );
 };
+
+// --- APP PRINCIPAL ---
 
 const App = () => {
     const [activeTab, setActiveTab] = useState('aiken');
@@ -1760,7 +1645,7 @@ const App = () => {
         { id: 'aiken', label: 'Calculadora V de Aiken', icon: Calculator },
         { id: 'cronbach', label: 'Alfa de Cronbach', icon: Activity },
         { id: 'ranges', label: 'Baremos y Rangos', icon: Table },
-        { id: 'survey', label: 'Gestión de Encuesta', icon: FileSpreadsheet },
+        { id: 'survey', label: 'Gesti├│n de Encuesta', icon: FileSpreadsheet },
         { id: 'recode', label: 'Recodificador Likert', icon: ArrowLeftRight },
     ];
 
@@ -1808,7 +1693,7 @@ const App = () => {
                         <h1 className="text-3xl font-bold text-slate-800">
                             {menuItems.find(i => i.id === activeTab)?.label}
                         </h1>
-                        <p className="text-slate-500 mt-1">Herramienta de análisis psicométrico profesional</p>
+                        <p className="text-slate-500 mt-1">Herramienta de an├ílisis psicom├®trico profesional</p>
                     </header>
 
                     <div className="animate-in fade-in duration-500">
