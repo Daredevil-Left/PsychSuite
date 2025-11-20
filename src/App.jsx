@@ -21,7 +21,9 @@ import {
     RefreshCw,
     FileText,
     Activity,
-    ArrowLeft
+    ArrowLeft,
+    MessageCircle,
+    Send
 } from 'lucide-react';
 
 // --- UTILIDADES Y CONFIGURACIÓN ---
@@ -1751,6 +1753,218 @@ const CronbachAlpha = ({ xlsxReady }) => {
     );
 };
 
+// --- CHATBOT DE AYUDA ---
+
+const Chatbot = ({ activeTab }) => {
+    const [isOpen, setIsOpen] = useState(false);
+    const [messages, setMessages] = useState([]);
+    const [inputMessage, setInputMessage] = useState('');
+    const messagesEndRef = useRef(null);
+
+    const scrollToBottom = () => {
+        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    };
+
+    useEffect(() => {
+        scrollToBottom();
+    }, [messages]);
+
+    // Contenido de ayuda contextual según la pestaña activa
+    const helpContent = {
+        aiken: {
+            welcome: "¡Hola! Soy tu asistente para la Calculadora V de Aiken. ¿En qué puedo ayudarte?",
+            faqs: [
+                { q: "¿Qué es la V de Aiken?", a: "La V de Aiken es un coeficiente que permite cuantificar la relevancia de un ítem respecto a un dominio de contenido a partir de las valoraciones de N jueces. Los valores oscilan entre 0 y 1, siendo 1 la mayor validez de contenido." },
+                { q: "¿Cómo configuro los jueces e ítems?", a: "En el panel de Configuración, ajusta el número de jueces (expertos que evaluarán) y el número de ítems (preguntas o elementos a validar). Luego define tu escala de valoración." },
+                { q: "¿Cómo interpreto los resultados?", a: "Generalmente se considera que un ítem es válido si V ≥ 0.70 (para 95% de confianza) o V ≥ 0.80 (para 99% de confianza). Los ítems marcados como 'Revisar' deberían ser reformulados o eliminados." },
+                { q: "¿Puedo importar datos desde Excel?", a: "Sí, usa el botón 'Importar Excel'. El archivo debe contener solo las valoraciones numéricas en una matriz donde las filas son ítems y las columnas son jueces." }
+            ]
+        },
+        cronbach: {
+            welcome: "¡Hola! Soy tu asistente para el Alfa de Cronbach. ¿Qué necesitas saber?",
+            faqs: [
+                { q: "¿Qué es el Alfa de Cronbach?", a: "Es un coeficiente que mide la consistencia interna de un instrumento. Indica qué tan correlacionados están los ítems entre sí. Valores entre 0.70-0.90 son considerados aceptables para la mayoría de propósitos." },
+                { q: "¿Cuál es la diferencia entre análisis Global y Por Variables?", a: "El análisis Global calcula el alfa para todas las columnas del archivo. El análisis Por Variables te permite definir rangos específicos de columnas para calcular el alfa de cada dimensión o subescala por separado." },
+                { q: "¿Cómo interpreto el resultado?", a: "Según Palella y Martins (2012): 0.81-1.00 = Muy alta, 0.61-0.80 = Alta, 0.41-0.60 = Media, 0.21-0.40 = Baja, 0.00-0.20 = Muy baja. Se recomienda que sea mayor a 0.61." },
+                { q: "¿Qué formato debe tener mi archivo Excel?", a: "La primera fila debe contener los encabezados (P1, P2, etc.). Las siguientes filas son los datos de cada participante. Cada columna representa un ítem del instrumento." }
+            ]
+        },
+        ranges: {
+            welcome: "¡Hola! Soy tu asistente para Baremos y Rangos. ¿Cómo puedo ayudarte?",
+            faqs: [
+                { q: "¿Para qué sirven los baremos?", a: "Los baremos permiten clasificar las puntuaciones obtenidas en un test en niveles cualitativos (Bajo, Medio, Alto, etc.). Esto facilita la interpretación de los resultados." },
+                { q: "¿Cómo configuro la escala del ítem?", a: "Define el puntaje mínimo y máximo que puede obtener cada ítem. Por ejemplo, si usas una escala Likert de 1 a 5, pon Min=1 y Max=5." },
+                { q: "¿Qué son las variables y dimensiones?", a: "Las variables son los constructos principales que mides (ej: Estrés Laboral). Las dimensiones son los componentes de cada variable (ej: Carga de trabajo, Ambiente laboral). Cada dimensión tiene un número específico de ítems." },
+                { q: "¿Cómo se calculan los rangos?", a: "El sistema calcula automáticamente los rangos dividiendo el puntaje total posible en intervalos iguales según el número de niveles que elijas (2, 3, 4 o 5 niveles)." }
+            ]
+        },
+        survey: {
+            welcome: "¡Hola! Soy tu asistente para Gestión de Encuesta. ¿En qué puedo ayudarte?",
+            faqs: [
+                { q: "¿Qué hace esta herramienta?", a: "Te permite configurar la estructura de tu encuesta (variables y dimensiones) y luego procesar un archivo Excel para calcular automáticamente las sumas o promedios por dimensión y variable." },
+                { q: "¿Cómo configuro mi encuesta?", a: "Define tus variables (constructos principales) y para cada una, agrega las dimensiones necesarias. Especifica cuántos ítems tiene cada dimensión. Luego haz clic en 'Generar Estructura'." },
+                { q: "¿Qué formato debe tener mi Excel?", a: "El archivo debe tener una fila de encabezados y luego los datos de cada participante. El número total de columnas debe coincidir con la suma de todos los ítems configurados." },
+                { q: "¿Puedo exportar los resultados?", a: "Sí, una vez procesados los datos, puedes exportar la tabla resumen a Excel usando el botón 'Exportar Excel'. Puedes elegir entre ver sumas o promedios." }
+            ]
+        },
+        recode: {
+            welcome: "¡Hola! Soy tu asistente para el Recodificador Likert. ¿Qué necesitas?",
+            faqs: [
+                { q: "¿Para qué sirve recodificar?", a: "Algunos ítems en escalas Likert están redactados de forma inversa. Por ejemplo, si 5='Totalmente de acuerdo' es positivo para la mayoría de ítems, pero hay un ítem donde 5 sería negativo, necesitas invertir ese ítem." },
+                { q: "¿Cómo funciona la inversión?", a: "La fórmula es: Nuevo Valor = (Máximo + Mínimo) - Valor Original. Por ejemplo, en una escala 1-5: si alguien marcó 5, se convierte en 1; si marcó 1, se convierte en 5." },
+                { q: "¿Cómo selecciono qué columnas invertir?", a: "Después de cargar tu archivo, haz clic en los encabezados de las columnas que deseas invertir. Las columnas seleccionadas se marcarán con un checkbox azul y se mostrarán en rojo en la vista previa." },
+                { q: "¿El archivo original se modifica?", a: "No, el archivo original no se modifica. Debes descargar el archivo recodificado usando el botón 'Exportar Resultados'." }
+            ]
+        }
+    };
+
+    const currentHelp = helpContent[activeTab] || helpContent.aiken;
+
+    useEffect(() => {
+        // Mensaje de bienvenida cuando se abre el chat
+        if (isOpen && messages.length === 0) {
+            setMessages([{
+                type: 'bot',
+                text: currentHelp.welcome,
+                timestamp: new Date()
+            }]);
+        }
+    }, [isOpen]);
+
+    useEffect(() => {
+        // Reset messages cuando cambia de pestaña
+        setMessages([]);
+        setIsOpen(false);
+    }, [activeTab]);
+
+    const handleSendMessage = () => {
+        if (!inputMessage.trim()) return;
+
+        // Agregar mensaje del usuario
+        const userMessage = {
+            type: 'user',
+            text: inputMessage,
+            timestamp: new Date()
+        };
+        setMessages(prev => [...prev, userMessage]);
+
+        // Buscar respuesta en FAQs
+        const lowerInput = inputMessage.toLowerCase();
+        let response = "Lo siento, no tengo una respuesta específica para esa pregunta. Aquí están las preguntas frecuentes que puedo responder:";
+
+        const matchedFaq = currentHelp.faqs.find(faq =>
+            lowerInput.includes(faq.q.toLowerCase().split('¿')[1]?.split('?')[0].toLowerCase()) ||
+            faq.q.toLowerCase().includes(lowerInput)
+        );
+
+        if (matchedFaq) {
+            response = matchedFaq.a;
+        } else {
+            // Si no hay coincidencia, mostrar todas las FAQs disponibles
+            response += "\n\n" + currentHelp.faqs.map((faq, i) => `${i + 1}. ${faq.q}`).join('\n');
+        }
+
+        // Agregar respuesta del bot
+        setTimeout(() => {
+            const botMessage = {
+                type: 'bot',
+                text: response,
+                timestamp: new Date()
+            };
+            setMessages(prev => [...prev, botMessage]);
+        }, 500);
+
+        setInputMessage('');
+    };
+
+    const handleQuickQuestion = (question) => {
+        setInputMessage(question);
+        setTimeout(() => handleSendMessage(), 100);
+    };
+
+    return (
+        <>
+            {/* Botón flotante */}
+            <button
+                onClick={() => setIsOpen(!isOpen)}
+                className="fixed bottom-6 right-6 bg-blue-600 text-white p-4 rounded-full shadow-lg hover:bg-blue-700 transition-all hover:scale-110 z-50"
+                title="Ayuda"
+            >
+                {isOpen ? <X size={24} /> : <MessageCircle size={24} />}
+            </button>
+
+            {/* Ventana de chat */}
+            {isOpen && (
+                <div className="fixed bottom-24 right-6 w-96 h-[500px] bg-white rounded-xl shadow-2xl border border-slate-200 flex flex-col z-50 animate-in slide-in-from-bottom-4 fade-in">
+                    {/* Header */}
+                    <div className="bg-blue-600 text-white p-4 rounded-t-xl flex items-center justify-between">
+                        <div className="flex items-center">
+                            <MessageCircle className="mr-2" size={20} />
+                            <div>
+                                <h3 className="font-bold">Asistente de Ayuda</h3>
+                                <p className="text-xs text-blue-100">Estoy aquí para ayudarte</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Messages */}
+                    <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-slate-50">
+                        {messages.map((msg, idx) => (
+                            <div key={idx} className={`flex ${msg.type === 'user' ? 'justify-end' : 'justify-start'}`}>
+                                <div className={`max-w-[80%] p-3 rounded-lg ${msg.type === 'user' ? 'bg-blue-600 text-white' : 'bg-white text-slate-800 border border-slate-200'}`}>
+                                    <p className="text-sm whitespace-pre-line">{msg.text}</p>
+                                    <span className={`text-[10px] mt-1 block ${msg.type === 'user' ? 'text-blue-100' : 'text-slate-400'}`}>
+                                        {msg.timestamp.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}
+                                    </span>
+                                </div>
+                            </div>
+                        ))}
+                        <div ref={messagesEndRef} />
+                    </div>
+
+                    {/* Quick Questions */}
+                    {messages.length <= 1 && (
+                        <div className="p-3 border-t bg-white">
+                            <p className="text-xs font-bold text-slate-600 mb-2">Preguntas frecuentes:</p>
+                            <div className="space-y-1">
+                                {currentHelp.faqs.slice(0, 3).map((faq, idx) => (
+                                    <button
+                                        key={idx}
+                                        onClick={() => handleQuickQuestion(faq.q)}
+                                        className="w-full text-left text-xs p-2 bg-slate-50 hover:bg-blue-50 rounded border border-slate-200 hover:border-blue-300 transition-colors"
+                                    >
+                                        {faq.q}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Input */}
+                    <div className="p-3 border-t bg-white rounded-b-xl">
+                        <div className="flex gap-2">
+                            <input
+                                type="text"
+                                value={inputMessage}
+                                onChange={(e) => setInputMessage(e.target.value)}
+                                onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
+                                placeholder="Escribe tu pregunta..."
+                                className="flex-1 p-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:border-blue-500"
+                            />
+                            <button
+                                onClick={handleSendMessage}
+                                className="bg-blue-600 text-white p-2 rounded-lg hover:bg-blue-700 transition-colors"
+                            >
+                                <Send size={18} />
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+        </>
+    );
+};
+
 const App = () => {
     const [activeTab, setActiveTab] = useState('aiken');
     const [isSidebarOpen, setSidebarOpen] = useState(true);
@@ -1820,6 +2034,9 @@ const App = () => {
                     </div>
                 </div>
             </main>
+
+            {/* Chatbot de Ayuda */}
+            <Chatbot activeTab={activeTab} />
         </div>
     );
 };
