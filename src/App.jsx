@@ -1103,29 +1103,37 @@ const SurveyConfig = ({ xlsxReady }) => {
 
                                 <div className="space-y-2 pl-2 border-l-2 border-slate-200">
                                     {v.dimensions.map((d) => (
-                                        <div key={d.id} className="mb-2">
-                                            <div className="flex gap-2 items-center mb-1">
-                                                <input
-                                                    type="text"
-                                                    value={d.name}
-                                                    onChange={(e) => updateDimension(v.id, d.id, 'name', e.target.value)}
-                                                    className="flex-1 p-1 text-xs border rounded"
-                                                    placeholder="Dimensión"
-                                                />
-                                                <input
-                                                    type="number"
-                                                    value={d.items}
-                                                    onChange={(e) => updateDimension(v.id, d.id, 'items', e.target.value)}
-                                                    className="w-14 p-1 text-xs border rounded text-center"
-                                                    placeholder="Items"
-                                                    title="Cantidad de preguntas"
-                                                />
-                                                <button onClick={() => removeDimension(v.id, d.id)} className="text-slate-300 hover:text-red-400">
-                                                    <X size={14} />
-                                                </button>
+                                        <div key={d.id} className="mb-2 bg-white p-2 rounded border border-slate-100 shadow-sm">
+                                            <div className="flex gap-2 items-center mb-2">
+                                                <div className="flex-1">
+                                                    <label className="text-[10px] text-slate-400 font-bold uppercase">Nombre</label>
+                                                    <input
+                                                        type="text"
+                                                        value={d.name}
+                                                        onChange={(e) => updateDimension(v.id, d.id, 'name', e.target.value)}
+                                                        className="w-full p-1 text-xs border rounded focus:border-blue-500 focus:outline-none"
+                                                        placeholder="Dimensión"
+                                                    />
+                                                </div>
+                                                <div className="w-16">
+                                                    <label className="text-[10px] text-slate-400 font-bold uppercase text-center block">Items</label>
+                                                    <input
+                                                        type="number"
+                                                        value={d.items}
+                                                        onChange={(e) => updateDimension(v.id, d.id, 'items', e.target.value)}
+                                                        className="w-full p-1 text-xs border rounded text-center focus:border-blue-500 focus:outline-none"
+                                                        placeholder="#"
+                                                    />
+                                                </div>
+                                                <div className="pt-4">
+                                                    <button onClick={() => removeDimension(v.id, d.id)} className="text-slate-300 hover:text-red-400 p-1">
+                                                        <X size={14} />
+                                                    </button>
+                                                </div>
                                             </div>
-                                            <div className="text-[10px] text-slate-400 pl-1 flex items-center">
-                                                <span className="bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded border border-slate-200 font-mono">
+                                            <div className="text-[10px] text-slate-400 flex items-center justify-between bg-slate-50 px-2 py-1 rounded">
+                                                <span>Rango:</span>
+                                                <span className="font-mono font-medium text-slate-600">
                                                     {questionRanges[`${v.id}-${d.id}`]}
                                                 </span>
                                             </div>
