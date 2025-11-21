@@ -1040,6 +1040,38 @@ const SurveyConfig = ({ xlsxReady }) => {
         XLSX.writeFile(wb, `resumen_encuesta_${summaryMode}.xlsx`);
     };
 
+    const copyForSPSS = () => {
+        if (!summaryData.length) return;
+
+        // Construir headers
+        const headers = ["Sujeto"];
+        structure.variables.forEach(v => {
+            v.dimensions.forEach(d => {
+                headers.push(`${v.name}_${d.name}`);
+            });
+            headers.push(`${v.name}_TOTAL`);
+        });
+
+        // Construir filas
+        const rows = summaryData.map(row => {
+            const rowData = [row.id];
+            row.vars.forEach(v => {
+                v.dims.forEach(d => rowData.push(d.val));
+                rowData.push(v.total);
+            });
+            return rowData.join('\t');
+        });
+
+        const tsvContent = [headers.join('\t'), ...rows].join('\n');
+
+        navigator.clipboard.writeText(tsvContent).then(() => {
+            alert("Datos copiados al portapapeles. Puedes pegarlos directamente en SPSS.");
+        }).catch(err => {
+            console.error('Error al copiar:', err);
+            alert("Error al copiar los datos.");
+        });
+    };
+
     return (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
             {/* Panel Izquierdo: Configuración */}
@@ -1149,6 +1181,9 @@ const SurveyConfig = ({ xlsxReady }) => {
                                         <button onClick={() => setSummaryMode('avg')} className={`px-3 py-1 text-xs font-medium transition-colors ${summaryMode === 'avg' ? 'bg-blue-600 text-white' : 'text-slate-600 hover:bg-slate-50'}`}>Promedios</button>
                                         <button onClick={() => setSummaryMode('sum')} className={`px-3 py-1 text-xs font-medium transition-colors ${summaryMode === 'sum' ? 'bg-blue-600 text-white' : 'text-slate-600 hover:bg-slate-50'}`}>Sumas</button>
                                     </div>
+                                    <Button variant="secondary" icon={FileText} onClick={copyForSPSS} disabled={summaryData.length === 0} className="text-xs py-1">
+                                        Copiar para SPSS
+                                    </Button>
                                     <Button variant="success" icon={Download} onClick={exportSummaryToExcel} disabled={summaryData.length === 0} className="text-xs py-1">
                                         Exportar Excel
                                     </Button>
@@ -1279,6 +1314,22 @@ const LikertRecoder = ({ xlsxReady }) => {
         XLSX.writeFile(wb, "datos_recodificados.xlsx");
     };
 
+    const copyForSPSS = () => {
+        if (!recodedRows.length) return;
+
+        // Construir contenido TSV
+        const headers = rawData.headers.join('\t');
+        const rows = recodedRows.map(row => row.join('\t')).join('\n');
+        const tsvContent = `${headers}\n${rows}`;
+
+        navigator.clipboard.writeText(tsvContent).then(() => {
+            alert("Datos copiados al portapapeles. Puedes pegarlos directamente en SPSS.");
+        }).catch(err => {
+            console.error('Error al copiar:', err);
+            alert("Error al copiar los datos.");
+        });
+    };
+
     return (
         <div className="space-y-6">
             <Card className="p-5 flex gap-6 items-end">
@@ -1295,7 +1346,10 @@ const LikertRecoder = ({ xlsxReady }) => {
                     <Button variant="primary" icon={Upload} disabled={!xlsxReady}>Cargar Archivo</Button>
                 </div>
                 {recodedRows.length > 0 && (
-                    <Button variant="success" icon={Download} onClick={exportData}>Exportar Resultados</Button>
+                    <>
+                        <Button variant="secondary" icon={FileText} onClick={copyForSPSS}>Copiar para SPSS</Button>
+                        <Button variant="success" icon={Download} onClick={exportData}>Exportar Resultados</Button>
+                    </>
                 )}
             </Card>
 
