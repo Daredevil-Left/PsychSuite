@@ -1180,20 +1180,20 @@ const SurveyConfig = ({ xlsxReady }) => {
 
                         {/* Tabla Resumen */}
                         <Card className="p-0 overflow-hidden flex flex-col h-[500px]">
-                            <div className="p-3 bg-slate-50 border-b flex justify-between items-center">
-                                <h3 className="font-bold text-slate-700 flex items-center">
+                            <div className="p-3 bg-slate-50 border-b flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                                <h3 className="font-bold text-slate-700 flex items-center whitespace-nowrap">
                                     <Table className="w-4 h-4 mr-2" /> Tabla Resumen
                                 </h3>
-                                <div className="flex gap-3 items-center">
-                                    <div className="flex bg-white rounded border overflow-hidden">
+                                <div className="flex flex-wrap gap-2 items-center w-full sm:w-auto justify-end">
+                                    <div className="flex bg-white rounded border overflow-hidden shrink-0">
                                         <button onClick={() => setSummaryMode('avg')} className={`px-3 py-1 text-xs font-medium transition-colors ${summaryMode === 'avg' ? 'bg-blue-600 text-white' : 'text-slate-600 hover:bg-slate-50'}`}>Promedios</button>
                                         <button onClick={() => setSummaryMode('sum')} className={`px-3 py-1 text-xs font-medium transition-colors ${summaryMode === 'sum' ? 'bg-blue-600 text-white' : 'text-slate-600 hover:bg-slate-50'}`}>Sumas</button>
                                     </div>
-                                    <Button variant="secondary" icon={FileText} onClick={copyForSPSS} disabled={summaryData.length === 0} className="text-xs py-1">
-                                        Copiar para SPSS
+                                    <Button variant="secondary" icon={FileText} onClick={copyForSPSS} disabled={summaryData.length === 0} className="text-xs py-1 whitespace-nowrap">
+                                        Copiar SPSS
                                     </Button>
-                                    <Button variant="success" icon={Download} onClick={exportSummaryToExcel} disabled={summaryData.length === 0} className="text-xs py-1">
-                                        Exportar Excel
+                                    <Button variant="success" icon={Download} onClick={exportSummaryToExcel} disabled={summaryData.length === 0} className="text-xs py-1 whitespace-nowrap">
+                                        Excel
                                     </Button>
                                 </div>
                             </div>
