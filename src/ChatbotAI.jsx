@@ -161,7 +161,11 @@ const ChatbotAI = ({ activeTab }) => {
 
 Usuario pregunta: ${inputMessage.trim()}
 
-Responde de forma clara, concisa y profesional en español. Si la pregunta no está relacionada con esta herramienta, indica amablemente que solo puedes ayudar con preguntas sobre ${activeTab === 'aiken' ? 'la Calculadora V de Aiken' : activeTab === 'cronbach' ? 'el Alfa de Cronbach' : activeTab === 'ranges' ? 'Baremos y Rangos' : activeTab === 'survey' ? 'Gestión de Encuesta' : 'el Recodificador Likert'}.`;
+Instrucciones:
+1. Responde de forma clara, concisa y profesional en español.
+2. Si la pregunta es sobre la herramienta actual, usa el contexto técnico proporcionado.
+3. Si la pregunta es de conocimiento general (por ejemplo: "¿Quién es Aiken?", "¿Qué es la psicometría?", "¿Cómo estás?"), RESPÓNDELA amablemente usando tu conocimiento general.
+4. NO te limites solo a la herramienta. Eres un asistente integral de psicometría.`;
 
                 const result = await model.generateContent(prompt);
                 const aiResponse = await result.response;
