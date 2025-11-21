@@ -1040,36 +1040,63 @@ const SurveyConfig = ({ xlsxReady }) => {
         XLSX.writeFile(wb, `resumen_encuesta_${summaryMode}.xlsx`);
     };
 
-    const copyForSPSS = () => {
+    const downloadSPSS = () => {
         if (!summaryData.length) return;
 
-        // Construir headers
-        const headers = ["Sujeto"];
-        structure.variables.forEach(v => {
-            v.dimensions.forEach(d => {
-                headers.push(`${v.name}_${d.name}`);
+        // 1. Definir nombres de variables seguros para SPSS (sin espacios, cortos)
+        // Usaremos notación V1_D1, V1_Total, etc.
+        const spssVars = ["ID"];
+        const varLabels = []; // Para el comando VARIABLE LABELS
+
+        structure.variables.forEach((v, vIdx) => {
+            v.dimensions.forEach((d, dIdx) => {
+                const safeName = `V${vIdx + 1}_D${dIdx + 1}`;
+                spssVars.push(safeName);
+                // Etiqueta descriptiva: "Nombre Variable - Nombre Dimensión"
+                varLabels.push(`${safeName} "${v.name} - ${d.name}"`);
             });
-            headers.push(`${v.name}_TOTAL`);
+            const totalName = `V${vIdx + 1}_Total`;
+            spssVars.push(totalName);
+            varLabels.push(`${totalName} "${v.name} - Total"`);
         });
 
-        // Construir filas
-        const rows = summaryData.map(row => {
-            const rowData = [row.id];
+        // 2. Construir Sintaxis SPSS
+        // DATA LIST LIST permite leer datos separados por espacios/tabs
+        let syntax = `* Sintaxis generada por PsychSuite.\n`;
+        syntax += `DATA LIST LIST / ${spssVars.join(' ')}.\n`;
+        syntax += `BEGIN DATA.\n`;
+
+        // 3. Insertar Datos
+        summaryData.forEach(row => {
+            const values = [row.id];
             row.vars.forEach(v => {
-                v.dims.forEach(d => rowData.push(d.val));
-                rowData.push(v.total);
+                v.dims.forEach(d => values.push(d.val));
+                values.push(v.total);
             });
-            return rowData.join('\t');
+            // Unir con comas o espacios. Usamos comas para seguridad decimal si fuera necesario, 
+            // pero DATA LIST LIST suele manejar bien espacios si los números son estándar.
+            // Aseguramos punto decimal para SPSS.
+            syntax += values.join(' ') + `\n`;
         });
 
-        const tsvContent = [headers.join('\t'), ...rows].join('\n');
+        syntax += `END DATA.\n\n`;
 
-        navigator.clipboard.writeText(tsvContent).then(() => {
-            alert("Datos copiados al portapapeles. Puedes pegarlos directamente en SPSS.");
-        }).catch(err => {
-            console.error('Error al copiar:', err);
-            alert("Error al copiar los datos.");
-        });
+        // 4. Asignar Etiquetas
+        syntax += `VARIABLE LABELS\n`;
+        syntax += varLabels.map(l => `  ${l}`).join('\n') + `.\n`;
+
+        // 5. Ejecutar
+        syntax += `EXECUTE.\n`;
+
+        // 6. Descargar archivo .sps
+        const blob = new Blob([syntax], { type: 'text/plain' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'datos_encuesta.sps';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
     };
 
     return (
@@ -1189,8 +1216,8 @@ const SurveyConfig = ({ xlsxReady }) => {
                                         <button onClick={() => setSummaryMode('avg')} className={`px-3 py-1 text-xs font-medium transition-colors ${summaryMode === 'avg' ? 'bg-blue-600 text-white' : 'text-slate-600 hover:bg-slate-50'}`}>Promedios</button>
                                         <button onClick={() => setSummaryMode('sum')} className={`px-3 py-1 text-xs font-medium transition-colors ${summaryMode === 'sum' ? 'bg-blue-600 text-white' : 'text-slate-600 hover:bg-slate-50'}`}>Sumas</button>
                                     </div>
-                                    <Button variant="secondary" icon={FileText} onClick={copyForSPSS} disabled={summaryData.length === 0} className="text-xs py-1 whitespace-nowrap">
-                                        Copiar SPSS
+                                    <Button variant="secondary" icon={FileText} onClick={downloadSPSS} disabled={summaryData.length === 0} className="text-xs py-1 whitespace-nowrap">
+                                        Sintaxis SPSS
                                     </Button>
                                     <Button variant="success" icon={Download} onClick={exportSummaryToExcel} disabled={summaryData.length === 0} className="text-xs py-1 whitespace-nowrap">
                                         Excel
@@ -1322,20 +1349,37 @@ const LikertRecoder = ({ xlsxReady }) => {
         XLSX.writeFile(wb, "datos_recodificados.xlsx");
     };
 
-    const copyForSPSS = () => {
+    const downloadSPSS = () => {
         if (!recodedRows.length) return;
 
-        // Construir contenido TSV
-        const headers = rawData.headers.join('\t');
-        const rows = recodedRows.map(row => row.join('\t')).join('\n');
-        const tsvContent = `${headers}\n${rows}`;
+        // Generar nombres de variables seguros (P1, P2, P3...)
+        const spssVars = rawData.headers.map((_, i) => `P${i + 1}`);
 
-        navigator.clipboard.writeText(tsvContent).then(() => {
-            alert("Datos copiados al portapapeles. Puedes pegarlos directamente en SPSS.");
-        }).catch(err => {
-            console.error('Error al copiar:', err);
-            alert("Error al copiar los datos.");
+        let syntax = `* Sintaxis generada por PsychSuite.\n`;
+        syntax += `DATA LIST LIST / ${spssVars.join(' ')}.\n`;
+        syntax += `BEGIN DATA.\n`;
+
+        recodedRows.forEach(row => {
+            syntax += row.join(' ') + `\n`;
         });
+
+        syntax += `END DATA.\n\n`;
+
+        // Etiquetas de variables (usando los encabezados originales)
+        syntax += `VARIABLE LABELS\n`;
+        const labels = rawData.headers.map((h, i) => `  P${i + 1} "${h.replace(/"/g, "'")}"`);
+        syntax += labels.join('\n') + `.\n`;
+
+        syntax += `EXECUTE.\n`;
+
+        const blob = new Blob([syntax], { type: 'text/plain' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'datos_recodificados.sps';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
     };
 
     return (
@@ -1355,7 +1399,7 @@ const LikertRecoder = ({ xlsxReady }) => {
                 </div>
                 {recodedRows.length > 0 && (
                     <>
-                        <Button variant="secondary" icon={FileText} onClick={copyForSPSS}>Copiar para SPSS</Button>
+                        <Button variant="secondary" icon={FileText} onClick={downloadSPSS}>Sintaxis SPSS</Button>
                         <Button variant="success" icon={Download} onClick={exportData}>Exportar Resultados</Button>
                     </>
                 )}
